@@ -1,0 +1,395 @@
+﻿<UserControl x:Class="Tagger.view.LeftSideBarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Tagger.view"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
+             xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:nmsp="clr-namespace:Tagger.viewmodel"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding TagManager.LoadTagsCommand}"/>
+            <i:InvokeCommandAction Command="{Binding Workspace.LoadSearchForPathCommand}"/>
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+
+    <UserControl.Resources>
+        <Style TargetType="ListBoxItem" x:Key="BaseListBoxItem">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="4,2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+
+        <Style TargetType="ListBoxItem" x:Key="QuickAccess" BasedOn="{StaticResource BaseListBoxItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="itemBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    Padding="{TemplateBinding Padding}"
+                                    CornerRadius="4">
+                            <ContentPresenter/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource BorderBackgroundHoverBrush}"/>
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBorderBrushHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource BorderBackgroundSelectedBrush}"/>
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBorderBrushSelectedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="removeSearchButton" TargetType="Button">
+            <Border Name="pinBorder" Padding="5" Margin="5,0" Background="Transparent" CornerRadius="4">
+
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup x:Name="CommonStates">
+                        <VisualState x:Name="Normal">
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="contentTranslate"
+                                                 Storyboard.TargetProperty="Y"
+                                                 To="1.0" Duration="0:0:0.15"/>
+
+                                <DoubleAnimation Storyboard.TargetName="contentScale"
+                                                 Storyboard.TargetProperty="ScaleX"
+                                                 To="1.0" Duration="0:0:0.15"/>
+                                <DoubleAnimation Storyboard.TargetName="contentScale"
+                                                 Storyboard.TargetProperty="ScaleY"
+                                                 To="1.0" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </VisualState>
+
+                        <VisualState x:Name="MouseOver">
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="contentScale"
+                                                 Storyboard.TargetProperty="ScaleX"
+                                                 To="1.15" Duration="0:0:0.15"/>
+                                <DoubleAnimation Storyboard.TargetName="contentScale"
+                                                 Storyboard.TargetProperty="ScaleY"
+                                                 To="1.15" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </VisualState>
+
+                        <VisualState x:Name="Disabled"/>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+
+                <ContentPresenter x:Name="content"
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Center"
+                                  TextBlock.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                  RenderTransformOrigin="0.5,0.5">
+                    <ContentPresenter.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="contentScale" ScaleX="1.0" ScaleY="1.0"/>
+                            <TranslateTransform x:Name="contentTranslate" X="0" Y="0"/>
+                        </TransformGroup>
+                    </ContentPresenter.RenderTransform>
+                </ContentPresenter>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="content" Property="TextBlock.Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style TargetType="ListBoxItem" x:Key="SearchListitem" BasedOn="{StaticResource BaseListBoxItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="itemBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="4">
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <ContentPresenter Grid.Column="0"/>
+
+                                <Button Grid.Column="1"
+                                        x:Name="removeButton"
+                                        Content="&#xE74D;"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Template="{StaticResource removeSearchButton}"
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        Command="{Binding DataContext.Workspace.RemoveSavedSearchCommand, 
+                                                 RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"/>
+                            </Grid>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource BorderBackgroundHoverBrush}"/>
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBorderBrushHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="itemBorder" Property="Background" Value="{DynamicResource BorderBackgroundSelectedBrush}"/>
+                                <Setter TargetName="itemBorder" Property="BorderBrush" Value="{DynamicResource BorderBorderBrushSelectedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="QuickAccessData">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock VerticalAlignment="Center" Text="&#xE915;"
+                       FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SavedSearchData">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock VerticalAlignment="Center" Text="&#xE915;"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+                <TextBlock Text="{Binding QueryText}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Margin="10"
+            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+            CornerRadius="4">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock FontSize="16" VerticalAlignment="Center" Padding="10,3">
+            <Run Text="&#xE838;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+            <Run Text="Быстрый доступ"/>
+                </TextBlock>
+
+                <ListBox Grid.Row="1"
+                         Background="Transparent"
+                         ItemsSource="{Binding Workspace.QuickAccess}"
+                         SelectedItem="{Binding Workspace.SelectedQuickAccessPath}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ItemContainerStyle="{StaticResource QuickAccess}"
+                         ItemTemplate="{StaticResource QuickAccessData}"/>
+
+                <TextBlock Grid.Row="2" FontSize="16" VerticalAlignment="Center" Padding="10,3">
+            <Run Text="&#xE840;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+            <Run Text="Сохраненный поиск"/>
+                </TextBlock>
+
+                <ListBox Grid.Row="3"
+                         Background="Transparent"
+                         ItemsSource="{Binding Workspace.SavedSearch}"
+                         SelectedItem="{Binding Workspace.SelectedSavedSearch}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ItemContainerStyle="{StaticResource SearchListitem}"
+                         ItemTemplate="{StaticResource SavedSearchData}"/>
+            </Grid>
+
+            <GridSplitter Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+
+            <Grid Grid.Row="2" Margin="0,5,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" FontSize="16" VerticalAlignment="Center" Padding="10,3">
+                    <Run Text="&#xE8EC;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+                    <Run Text="Теги"/>
+                </TextBlock>
+
+                <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,10,0">
+                    <TextBox x:Name="SearhTextBox"
+                         Text="{Binding TagManager.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="14"
+                         VerticalAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         Padding="3,0,0,0"/>
+
+                    <TextBlock Text="Поиск/добавление тегов"
+                               FontSize="14"
+                               Padding="5,0,0,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=SearhTextBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <Button Grid.Row="0" Grid.Column="2"
+                        Content="&#xE710;"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        Height="{Binding ActualHeight, ElementName=SearhTextBox}"
+                        Margin="0,0,5,0"
+                        Command="{Binding TagManager.CreateTagCommand}"
+                        ToolTip="Создать новый тег из строки поиска"/>
+
+                <ListBox x:Name="tagList"
+                         Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,5"
+                         ItemsSource="{Binding TagManager.TagsView}"
+                         Tag="{Binding DataContext, RelativeSource={RelativeSource Self}}"
+                         SelectionMode="Extended"
+                         Background="Transparent"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel">
+
+                    <i:Interaction.Behaviors>
+                        <nmsp:MultiSelectionBehavior SelectedItems="{Binding TagManager.SelectedTags}"/>
+                    </i:Interaction.Behaviors>
+
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <vwp:VirtualizingWrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Width" Value="Auto"/>
+                            <Setter Property="MinHeight" Value="50"/>
+                            <Setter Property="Margin" Value="4"/>
+                            <Setter Property="Padding" Value="6"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="Background" Value="{DynamicResource BorderBackgroundHoverBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBorderBrushHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            <Setter Property="Tag" Value="{Binding DataContext.TagManager, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                            <EventSetter Event="PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"/>
+                            <Setter Property="ContextMenu">
+                                <Setter.Value>
+                                    <ContextMenu>
+                                        <MenuItem Header="Применить к выделенным файлам"
+                                                  Command="{Binding PlacementTarget.Tag.ApplyToSelectedFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding Path=Id}"/>
+                                        <MenuItem Header="Удалить"
+                                                  Command="{Binding PlacementTarget.Tag.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding Path=Id}"/>
+                                    </ContextMenu>
+                                </Setter.Value>
+                            </Setter>
+
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate>
+                                        <Border x:Name="tagBorder"
+                                            Background="{TemplateBinding Background}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            Padding="{TemplateBinding Padding}"
+                                            CornerRadius="4">                                            
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Name}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding Name}"
+                                                           Margin="0,0,4,0"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Files.Count, StringFormat='({0})'}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"
+                                                           FontWeight="SemiBold"
+                                                           Opacity="0.75"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="tagBorder" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                                <Setter TargetName="tagBorder" Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="Selector.IsSelected" Value="True">
+                                                <Setter TargetName="tagBorder" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                <Setter TargetName="tagBorder" Property="BorderBrush" Value="Transparent"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <!--<ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} ({1})">
+                                    <Binding Path="Name"/>
+                                    <Binding Path="Files.Count"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>-->
+                </ListBox>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

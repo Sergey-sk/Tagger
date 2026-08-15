@@ -1,0 +1,144 @@
+﻿<Window x:Class="Tagger.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Tagger"
+        xmlns:view="clr-namespace:Tagger.view"
+        mc:Ignorable="d"
+        Title="Tagger" Height="450" MinWidth="850" Width="850" WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"
+        WindowState="Maximized">
+
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                        Executed="MinimizeWindowExecute"/>
+        <CommandBinding Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                        Executed="MaximizeWindowExecute"/>
+        <CommandBinding Command="{x:Static SystemCommands.RestoreWindowCommand}"
+                        Executed="RestoreWindowExecute"/>
+        <CommandBinding Command="{x:Static SystemCommands.CloseWindowCommand}"
+                        Executed="CloseWindowExecute"/>
+    </Window.CommandBindings>
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="0"
+            CaptionHeight="{x:Static SystemParameters.WindowCaptionHeight}"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/view/style/WindowButtons.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <local:WidthConverter x:Key="WidthConverter"/>
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+            <Style TargetType="Window" BasedOn="{StaticResource {x:Type Window}}">
+                <Setter Property="Padding" Value="0"/>
+
+                <Style.Triggers>
+                    <Trigger Property="WindowState" Value="Maximized">
+                        <Setter Property="Padding" Value="6"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding Workspace.ChooseFolderCommand}"/>
+    </Window.InputBindings>
+
+    <Grid Background="Transparent"
+          Margin="{Binding Padding, RelativeSource={RelativeSource AncestorType=Window}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <view:TitleBarView Grid.Row="0"/>
+
+        <view:ToolBarView Grid.Row="1"/>
+
+        <Border Grid.Row="2" Margin="0,5,0,0" BorderBrush="LightGray" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"
+                                      MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WidthConverter}, ConverterParameter=0.2}"
+                                      MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WidthConverter}, ConverterParameter=0.45}"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <view:LeftSideBarView x:Name="leftSide"
+                                      Grid.Column="0"/>
+
+                <GridSplitter Grid.Column="1"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Stretch"/>
+
+                <view:MainWorkspaceView x:Name="Workspace" Grid.Column="2"/>
+            </Grid>
+        </Border>
+
+        <StatusBar Grid.Row="3" Background="Transparent">
+            <Grid Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StatusBar}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0"
+                      VerticalAlignment="Center"
+                      Margin="10,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Text="{Binding Scanner.ProgressStatus}"
+                               FontSize="12"/>
+
+                    <ProgressBar Grid.Column="1"
+                                 Height="4"
+                                 Width="150"
+                                 Margin="5,0,5,0"
+                                 IsIndeterminate="True"
+                                 VerticalAlignment="Center"
+                                 Visibility="{Binding Scanner.IsScaning, Converter={StaticResource BoolToVis}}"/>
+
+                    <Button Grid.Column="2"
+                            Content="Отменить сканирование"
+                            Command="{Binding Scanner.StartScanCancelCommand}"
+                            Style="{DynamicResource AccentButtonStyle}"
+                            Visibility="{Binding Scanner.IsScaning, Converter={StaticResource BoolToVis}}"/>
+                </Grid>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,10,0">
+
+                    <TextBlock Text="{Binding ElementName=Workspace, Path=FileListView.Items.Count, StringFormat='Всего файлов {0}'}" 
+                               VerticalAlignment="Center"/>
+
+                    <Border Width="1" Height="12" Margin="12,0" 
+                            Background="{DynamicResource ControlStrongStrokeColorDefaultBrush}" 
+                            VerticalAlignment="Center"/>
+
+                    <TextBlock Text="{Binding ElementName=Workspace, Path=FileListView.SelectedItems.Count, StringFormat='Выбрано: {0}'}" 
+                               VerticalAlignment="Center"
+                               Margin="0,0,25,0"/>
+                </StackPanel>
+            </Grid>
+        </StatusBar>
+    </Grid>
+</Window>

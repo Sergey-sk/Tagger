@@ -1,0 +1,122 @@
+﻿<UserControl x:Class="Tagger.view.TitleBarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Tagger.view"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/view/style/WindowButtons.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Height="{DynamicResource {x:Static SystemParameters.WindowCaptionHeight}}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="&#xE1CB;"
+                   FontFamily="Segoe Fluent Icons"
+                   FontSize="14"
+                   VerticalAlignment="Center"
+                   Margin="10,0"/>
+
+        <Menu Grid.Column="1"
+              Background="Transparent"
+              VerticalAlignment="Top"
+              WindowChrome.IsHitTestVisibleInChrome="True"
+              Margin="0">
+            <MenuItem Header="Файл">
+                <MenuItem Header="Выбрать папку" InputGestureText="Ctrl+O"
+                          Command="{Binding Workspace.ChooseFolderCommand}"/>
+                <MenuItem Header="Сканировать"
+                          Command="{Binding Scanner.StartScanCommand}"/>
+            </MenuItem>
+            <MenuItem Header="Настройки">
+                <MenuItem Header="Тема">
+                    <MenuItem Header="Светлая"
+                              IsCheckable="True"
+                              Command="{Binding ChangeThemeCommand}"
+                              CommandParameter="Light">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem }}">
+                                <Setter Property="IsChecked" Value="False"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentTheme}" Value="Light">
+                                        <Setter Property="IsChecked" Value="True"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+
+                    <MenuItem Header="Темная"
+                              IsCheckable="True"
+                              Command="{Binding ChangeThemeCommand}"
+                              CommandParameter="Dark">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem }}">
+                                <Setter Property="IsChecked" Value="False"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentTheme}" Value="Dark">
+                                        <Setter Property="IsChecked" Value="True"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+
+                    <MenuItem Header="Как в системе"
+                              IsCheckable="True"
+                              Command="{Binding ChangeThemeCommand}"
+                              CommandParameter="System">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem }}">
+                                <Setter Property="IsChecked" Value="False"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentTheme}" Value="System">
+                                        <Setter Property="IsChecked" Value="True"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                </MenuItem>
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Column="2"/>
+
+        <StackPanel Grid.Column="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    WindowChrome.IsHitTestVisibleInChrome="True">
+            <Button Style="{StaticResource MinimizedButton}"
+                    Command="{x:Static SystemCommands.MinimizeWindowCommand}"/>
+
+            <Button>
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource MaximizedButton}">
+                        <Setter Property="Command" Value="{x:Static SystemCommands.MaximizeWindowCommand}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                                <Setter Property="Command" Value="{x:Static SystemCommands.RestoreWindowCommand}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+
+            <Button Style="{StaticResource CloseButton}"
+                    Command="{x:Static SystemCommands.CloseWindowCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
