@@ -1,7 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -104,8 +103,6 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         partial void OnSelectedSavedSearchChanged(SavedSearch value)
         {
-            if (value == null) return;
-
             WeakReferenceMessenger.Default.Send(new ApplySavedSearchMessage(value));
         }
 
@@ -118,7 +115,7 @@ namespace Tagger.viewmodel.WorkspaceViewModel
         [RelayCommand]
         private async Task LoadSearchForPathAsync(string path)
         {
-            if (!string.IsNullOrEmpty(path)) return;
+            if (string.IsNullOrEmpty(path)) return;
 
             var filteredSearches = await _savedSearchService.LoadSavedSearchesForPathAsync(path);
 
@@ -156,6 +153,8 @@ namespace Tagger.viewmodel.WorkspaceViewModel
             }
 
             var newSearch = new SavedSearch { QueryText = _searchText, FolderPath = CurrentPath };
+
+            await _savedSearchService.AddSearchAsync(newSearch);
 
             SavedSearch.Add(newSearch);
             _selectedSavedSearch = newSearch;
