@@ -201,6 +201,12 @@ namespace Tagger.viewmodel.TagManagerViewModel
         [RelayCommand]
         private async Task RemoveTagAsync(int tagId)
         {
+            int filesCount = await _tagService.GetFilesCountByTagId(tagId);
+
+            var result = _dialogService.ShowMessage($"Удалить тег? ({filesCount} файлов)", "Удаление тега", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.No) return;
+
             try
             {
                 await _tagService.RemoveTagAsync(tagId);

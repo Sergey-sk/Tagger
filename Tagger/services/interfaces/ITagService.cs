@@ -13,5 +13,6 @@ namespace Tagger.services.interfaces
         Task<List<int>> GetFileIdsByPathAsync(List<string> paths);
         Task<List<FileRecord>> GetFilesByIdsAsync(List<int> fileIds);
         Task<FileRecord?> ApplyTagsToFilesAsync(int fileId, List<int> tagIds);
+        Task<int> GetFilesCountByTagId(int tagId);
     }
 }

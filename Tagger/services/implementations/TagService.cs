@@ -192,5 +192,14 @@ namespace Tagger.services.implementations
                 .Where(f => fileIds.Contains(f.Id))
                 .ToListAsync();
         }
+
+        public async Task<int> GetFilesCountByTagId(int tagId)
+        {
+            var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Tags
+                .Where(t => t.Id == tagId)
+                .Select(t => t.Files.Count)
+                .FirstOrDefaultAsync();
+        }
     }
 }
