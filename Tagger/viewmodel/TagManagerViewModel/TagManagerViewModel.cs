@@ -1,24 +1,26 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
+using GongSolutions.Wpf.DragDrop;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using Tagger.messages;
 using Tagger.model;
+using Tagger.services;
 using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.TagManagerViewModel
 {
-    public partial class TagManagerViewModel : ObservableObject // все что касается управления тегами
+    public partial class TagManagerViewModel : ObservableObject
     {
-        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IDialogService _dialogService;
+        private readonly ITagService _tagService;
+        private readonly IFileIndexingService _fileIndexingService;
+
+        public IDragSource DragHandler { get; }
+        public IDropTarget DropHandler { get; }
 
         [ObservableProperty]
         private ObservableCollection<Tag> _tags;
@@ -26,10 +28,10 @@ namespace Tagger.viewmodel.TagManagerViewModel
         [ObservableProperty]
         private string _searchText;
 
-        public ObservableCollection<Tag> SelectedTags { get; set; } = [];
-
         [ObservableProperty]
         private ICollectionView? _tagsView;
+
+        public ObservableCollection<Tag> SelectedTags { get; set; } = [];
 
         private List<FileRecord> _selectedFiles = [];
 
@@ -43,15 +45,20 @@ namespace Tagger.viewmodel.TagManagerViewModel
             }
         }
 
-        public TagManagerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory, IDialogService dialogService)
+        public TagManagerViewModel(IDialogService dialogService,
+                                   ITagService tagService,
+                                   IFileIndexingService fileIndexingService)
         {
-            _contextFactory = contextFactory;
             _dialogService = dialogService;
+            _tagService = tagService;
+            _fileIndexingService = fileIndexingService;
+
+            DragHandler = new TagDragHandler(dialogService);
+            DropHandler = new TagDropHandler();
 
             SelectedTags.CollectionChanged += (s, e) =>
             {
-                var currentSelection = SelectedTags.Select(t => t.Name).ToList();
-                WeakReferenceMessenger.Default.Send(new ApplyTagToSearch(currentSelection));
+                WeakReferenceMessenger.Default.Send(new ApplyTagToSearch(SelectedTags.ToList()));
                 OnPropertyChanged(nameof(CurrentFilterStr));
             };
 
@@ -65,119 +72,55 @@ namespace Tagger.viewmodel.TagManagerViewModel
             WeakReferenceMessenger.Default.Register<SelectedItemsChangedMessage>(this, (r, message) =>
             {
                 _selectedFiles = message.selectedItems;
+                ApplyTagToFilesCommand.NotifyCanExecuteChanged();
+            });
 
-                ApplyToSelectedFilesCommand.NotifyCanExecuteChanged();
+            WeakReferenceMessenger.Default.Register<ExecuteTagDrop>(this, async (r, message) =>
+                await ApplyTagToFilesAsync(message.tagId));
+
+            WeakReferenceMessenger.Default.Register<ExecuteExternalTagDrop>(this, async (r, message) =>
+                await HandleExternalDropAsync(message.tagId, message.paths));
+
+            WeakReferenceMessenger.Default.Register<ApplyFileMessage>(this, async (r, message) =>
+                await OnApplyFile(message));
+
+            WeakReferenceMessenger.Default.Register<RemoveSelectedTag>(this, (r, message) =>
+            {
+                foreach(var tag in message.tagsToRemove)
+                {
+                    SelectedTags.Remove(tag);
+                }
             });
         }
 
-        partial void OnSearchTextChanged(string value)
+        /// <summary>
+        /// Вызывается при перетаскивании тега на файл
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private async Task OnApplyFile(ApplyFileMessage message)
         {
+            var savedFile = await _tagService.ApplyTagsToFilesAsync(message.fileId, message.tagIds);
+            if (savedFile == null) return;
+
+            var tagIdsSet = message.tagIds.ToHashSet();
+
+            List<Tag> uiTags = Tags
+                .Where(t => tagIdsSet.Contains(t.Id))
+                .ToList();
+
+            foreach (var uiTag in uiTags)
+            {
+                if (!uiTag.Files.Any(f => f.Id == message.fileId))
+                    uiTag.Files.Add(savedFile);
+            }
+
+            var sorted = Tags.OrderByDescending(t => t.Files.Count).ToList();
+            Tags.Clear();
+            foreach (var tag in sorted)
+                Tags.Add(tag);
+
             TagsView?.Refresh();
-            CreateTagCommand.NotifyCanExecuteChanged();
-        }
-
-        [RelayCommand]
-        private async Task LoadTagsAsync()
-        {
-            //if(Tags != null)
-            //{
-            //    foreach (var tag in Tags)
-            //        tag.PropertyChanged -= Tag_PropertyChanged;
-            //}
-            if (SelectedTags.Count > 0) SelectedTags.Clear();
-            OnPropertyChanged(nameof(CurrentFilterStr));
-
-            using var context = await _contextFactory.CreateDbContextAsync();
-
-            var collection = await context.Tags
-                    .AsNoTracking()
-                    .Include(t => t.Files)
-                    .OrderByDescending(t => t.Files.Count)
-                    .ToListAsync();
-
-            Tags = new ObservableCollection<Tag>(collection);
-            //foreach (var tag in Tags)
-            //{
-            //    tag.PropertyChanged += Tag_PropertyChanged;
-            //}
-
-            TagsView = CollectionViewSource.GetDefaultView(Tags);
-            TagsView.Filter = FilterTags;
-
-            OnPropertyChanged(nameof(CurrentFilterStr));
-        }
-
-        //TODO: при добавлении тега к файлам тег у них не показывается, только при перезаходе
-        [RelayCommand(CanExecute = nameof(CanCreateTag))]
-        private async Task CreateTagAsync()
-        {
-            string tagName = SearchText.Trim();
-
-            if (string.IsNullOrWhiteSpace(tagName)) return;
-
-            using var context = await _contextFactory.CreateDbContextAsync();
-
-            var exist = await context.Tags
-                .AsNoTracking()
-                .AnyAsync(t => t.Name.ToLower() == tagName.ToLower());
-
-            if (exist)
-            {
-                SearchText = string.Empty;
-                _dialogService.ShowMessage("Тег с таким именем уже существует", "Внимание!", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                return;
-            }
-
-            var newTag = new Tag
-            {
-                Name = tagName,
-            };
-
-            context.Tags.Add(newTag);
-            await context.SaveChangesAsync();
-
-            //newTag.PropertyChanged += Tag_PropertyChanged;
-
-            Tags.Add(newTag);
-
-            newTag.IsSelected = true;
-
-            if (!SelectedTags.Contains(newTag))
-            {
-                SelectedTags.Add(newTag);
-                OnPropertyChanged(nameof(CurrentFilterStr));
-            }
-
-            SearchText = string.Empty;
-        }
-
-        private bool CanCreateTag() => !string.IsNullOrWhiteSpace(SearchText);
-
-        [RelayCommand]
-        private async Task RemoveTagAsync(int tagId)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-
-            var tag = await context.Tags
-                .FirstOrDefaultAsync(t => t.Id == tagId);
-
-            if (tag != null)
-            {
-                context.Tags.Remove(tag);
-                await context.SaveChangesAsync();
-
-                await Application.Current.Dispatcher.InvokeAsync(async () =>
-                {
-                    var tagInUI = Tags.FirstOrDefault(t => t.Id == tagId);
-                    if (tagInUI != null)
-                    {
-                        tagInUI.IsSelected = false;
-                        Tags.Remove(tagInUI);
-                    }
-                });
-
-                WeakReferenceMessenger.Default.Send(new RemoveTagMessage(tag.Name));
-            }
         }
 
         private void ResetSelectedTags()
@@ -189,18 +132,11 @@ namespace Tagger.viewmodel.TagManagerViewModel
             OnPropertyChanged(nameof(CurrentFilterStr));
         }
 
-        //private void Tag_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        //{
-        //    if (e.PropertyName == nameof(Tag.IsSelected) && sender is Tag tag)
-        //    {
-        //        if (tag.IsSelected)
-        //            SelectedTags.Add(tag);
-        //        else SelectedTags.Remove(tag);
-
-        //        OnPropertyChanged(nameof(CurrentFilterStr));
-        //        WeakReferenceMessenger.Default.Send(new ApplyTagToSearch([..SelectedTags.Select(t => t.Name)]));
-        //    }
-        //}
+        partial void OnSearchTextChanged(string value)
+        {
+            TagsView?.Refresh();
+            CreateTagCommand.NotifyCanExecuteChanged();
+        }
 
         private bool FilterTags(object obj)
         {
@@ -214,53 +150,154 @@ namespace Tagger.viewmodel.TagManagerViewModel
             return false;
         }
 
-        [RelayCommand(CanExecute = nameof(CanApplyFilesToTag))]
-        private async Task ApplyToSelectedFiles(int tagId)
+        [RelayCommand]
+        private async Task LoadTagsAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-
-            var tag = await context.Tags
-                .Include(t => t.Files)
-                .FirstOrDefaultAsync(t => t.Id == tagId);
-
-            if (tag == null) return;
-
-            var selectedFileIds = _selectedFiles.Select(f => f.Id);
-
-            var filesToAttach = await context.Files
-                .Where(f => selectedFileIds.Contains(f.Id))
-                .ToListAsync();
-
-            foreach (var file in filesToAttach)
+            try
             {
-                if (!tag.Files.Any(f => f.Id == file.Id))
-                {
-                    context.Files.Attach(file);
-                    tag.Files.Add(file);
-                }
+                SelectedTags.Clear();
+                var tags = await _tagService.LoadTagsAsync();
+                Tags = new ObservableCollection<Tag>(tags);
+
+                TagsView = CollectionViewSource.GetDefaultView(Tags);
+                TagsView.Filter = FilterTags;
             }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка загрузки: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-            await context.SaveChangesAsync();
+        [RelayCommand(CanExecute = nameof(CanCreateTag))]
+        private async Task CreateTagAsync()
+        {
+            try
+            {
+                var newTag = await _tagService.CreateTagAsync(SearchText.Trim());
 
-            var tagInUi = Tags.FirstOrDefault(f => f.Id == tagId);
+                Tags.Add(newTag);
+
+                if (!SelectedTags.Contains(newTag))
+                {
+                    SelectedTags.Add(newTag);
+                    OnPropertyChanged(nameof(CurrentFilterStr));
+                }
+
+                SearchText = string.Empty;
+            }
+            catch (ArgumentException ex)
+            {
+                SearchText = string.Empty;
+                _dialogService.ShowMessage(ex.Message, "Внимание!", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private bool CanCreateTag() => !string.IsNullOrWhiteSpace(SearchText);
+
+        [RelayCommand]
+        private async Task RemoveTagAsync(int tagId)
+        {
+            try
+            {
+                await _tagService.RemoveTagAsync(tagId);
+
+                var tagInUI = Tags.FirstOrDefault(t => t.Id == tagId);
+                if (tagInUI != null)
+                {
+                    Tags.Remove(tagInUI);
+                    if (SelectedTags.Contains(tagInUI))
+                        SelectedTags.Remove(tagInUI);
+                }
+
+                WeakReferenceMessenger.Default.Send(new RemoveTagMessage(tagId));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка удаления: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Вызывается, когда файлы перетаскиваются на тег или когда файлы выбираются и добавляются к тегу с помощью ContextMenu
+        /// </summary>
+        /// <param name="tagId"></param>
+        /// <returns></returns>
+
+        [RelayCommand(CanExecute = nameof(CanApplyFilesToTag))]
+        private async Task ApplyTagToFilesAsync(int tagId)
+        {
+            try
+            {
+                var selectedFileIds = _selectedFiles.Select(f => f.Id).ToList();
+
+                await _tagService.ApplyFilesToTagsAsync(tagId, selectedFileIds);
+
+                UpdateUiTags(tagId, _selectedFiles);
+
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, selectedFileIds));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void UpdateUiTags(int tagId, List<FileRecord> filesToAdd)
+        {
+            var tagInUi = Tags.FirstOrDefault(t => t.Id == tagId);
             if (tagInUi != null)
             {
-                foreach (var file in filesToAttach)
+                foreach (var file in filesToAdd)
                 {
                     if (!tagInUi.Files.Any(f => f.Id == file.Id))
                         tagInUi.Files.Add(file);
                 }
             }
 
-            Tags = [.. Tags.OrderByDescending(t => t.Files.Count)];
+            var sorted = Tags.OrderByDescending(t => t.Files.Count).ToList();
+            Tags.Clear();
+            foreach (var tag in sorted)
+                Tags.Add(tag);
 
-            TagsView = CollectionViewSource.GetDefaultView(Tags);
-            TagsView.Filter = FilterTags;
             TagsView?.Refresh();
-
-            WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, selectedFileIds.ToList()));
         }
 
         private bool CanApplyFilesToTag() => _selectedFiles.Count > 0;
+
+        private async Task HandleExternalDropAsync(int tagId, string[] filePaths)
+        {
+            try
+            {
+                bool isOperationActive = true;
+
+                var progress = new Progress<string>(msg =>
+                {
+                    if (isOperationActive)
+                        WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(true, msg));
+                });
+
+                var fileIds = await _fileIndexingService.AddFilesFromPathAsync(filePaths.ToList(), progress);
+
+                await _tagService.ApplyFilesToTagsAsync(tagId, fileIds);
+
+                var files = await _tagService.GetFilesByIdsAsync(fileIds);
+
+                UpdateUiTags(tagId, files);
+
+                isOperationActive = false;
+
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, fileIds));
+                WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Готово"));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Ошибка"));
+            }
+        }
     }
 }

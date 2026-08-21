@@ -1,7 +1,9 @@
-﻿using System;
+﻿using CommunityToolkit.Mvvm.Messaging.Messages;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Tagger.model;
+using Tagger.services.Drag_Drop;
 
 namespace Tagger.messages
 {
@@ -15,14 +17,22 @@ namespace Tagger.messages
 
     public record ApplySavedSearchMessage(SavedSearch search);
 
-    public record ApplyTagToSearch(List<string> tags);
+    public record ApplyTagToSearch(List<Tag> tags);
 
     public record SelectedItemsChangedMessage(List<FileRecord> selectedItems);
 
     public record ChangeProgressStatus(bool isLoading, string value);
 
     public record ApplyTagMessage(int tagId, List<int> fileIds);
-    public record RemoveTagMessage(string tagName);
+    public record RemoveTagMessage(int tagId);
+
+    public record ApplyFileMessage(int fileId, List<int> tagIds);
+
+    public record ExecuteTagDrop(int tagId);
+    public record ExecuteFileDrop(int fileId, DraggedObjectsPackage<Tag> tags);
+    public record ExecuteExternalTagDrop(int tagId, string[] paths);
+
+    public record RemoveSelectedTag(List<Tag> tagsToRemove);
 
     public enum ScanStatus
     {

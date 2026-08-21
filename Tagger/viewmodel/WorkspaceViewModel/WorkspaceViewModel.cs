@@ -11,10 +11,10 @@ using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.WorkspaceViewModel
 {
-    public partial class WorkspaceViewModel : ObservableObject //перемещенние - выбор, быстрый доступ, сохраненный поиск, d&d
+    public partial class WorkspaceViewModel : ObservableObject
     {
         private readonly IDialogService _dialogService;
-        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ISavedSearchService _savedSearchService;
 
         private string _searchText;
 
@@ -33,10 +33,11 @@ namespace Tagger.viewmodel.WorkspaceViewModel
         [ObservableProperty]
         private ObservableCollection<string> _quickAccess = new();
 
-        public WorkspaceViewModel(IDialogService dialogService, IDbContextFactory<ApplicationDbContext> contextFactory)
+        public WorkspaceViewModel(IDialogService dialogService,
+                                  ISavedSearchService savedSearchService)
         {
             _dialogService = dialogService;
-            _contextFactory = contextFactory;
+            _savedSearchService = savedSearchService;
 
             LoadQuickAccess();
 
@@ -103,6 +104,8 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         partial void OnSelectedSavedSearchChanged(SavedSearch value)
         {
+            if (value == null) return;
+
             WeakReferenceMessenger.Default.Send(new ApplySavedSearchMessage(value));
         }
 
@@ -115,14 +118,18 @@ namespace Tagger.viewmodel.WorkspaceViewModel
         [RelayCommand]
         private async Task LoadSearchForPathAsync(string path)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            if (!string.IsNullOrEmpty(path)) return;
 
-            var filteredSearches = await context.SavedSearches
-                .AsNoTracking()
-                .Where(s => s.FolderPath == CurrentPath)
-                .ToListAsync();
+            var filteredSearches = await _savedSearchService.LoadSavedSearchesForPathAsync(path);
 
-            SavedSearch = new ObservableCollection<SavedSearch>(filteredSearches);
+            if (SavedSearch == null)
+                SavedSearch = new ObservableCollection<SavedSearch>(filteredSearches);
+            else
+            {
+                SavedSearch.Clear();
+                foreach (var search in filteredSearches)
+                    SavedSearch.Add(search);
+            }
         }
 
         [RelayCommand]
@@ -143,23 +150,16 @@ namespace Tagger.viewmodel.WorkspaceViewModel
                 return;
             }
 
-            if (!SavedSearch.Any(s => s.QueryText == _searchText))
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-
-                var newSearch = new SavedSearch { QueryText = _searchText, FolderPath = CurrentPath };
-
-                await context.SavedSearches.AddAsync(newSearch);
-                await context.SaveChangesAsync();
-
-                SavedSearch.Add(newSearch);
-                _selectedSavedSearch = newSearch;
-                OnPropertyChanged(nameof(SelectedSavedSearch));
-            }
-            else
+            if (SavedSearch.Any(s => s.QueryText == _searchText))
             {
                 _dialogService.ShowMessage("Поиск уже сохранен", "Внимание!", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+
+            var newSearch = new SavedSearch { QueryText = _searchText, FolderPath = CurrentPath };
+
+            SavedSearch.Add(newSearch);
+            _selectedSavedSearch = newSearch;
+            OnPropertyChanged(nameof(SelectedSavedSearch));
         }
 
         [RelayCommand]
@@ -169,12 +169,8 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
             if (result == MessageBoxResult.Yes && search != null)
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
-
+                await _savedSearchService.RemoveSearchAsync(search);
                 SavedSearch.Remove(search);
-
-                context.SavedSearches.Remove(search);
-                await context.SaveChangesAsync();
             }
         }
     }

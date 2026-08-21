@@ -10,6 +10,7 @@ namespace Tagger
         public DbSet<FileRecord> Files { get; set; } = null!;
         public DbSet<Tag> Tags { get; set; } = null!;
         public DbSet<SavedSearch> SavedSearches { get; set; } = null!;
+        public DbSet<FileTag> FileTags { get; set; } = null!;
 
         public ApplicationDbContext() : base()
         {
@@ -38,15 +39,26 @@ namespace Tagger
                 entity.ToTable("Files");
 
                 entity.HasIndex(fr => fr.Path).IsUnique();
-
-                entity.HasMany(fr => fr.Tags)
-                       .WithMany(t => t.Files)
-                       .UsingEntity(j => j.ToTable("FileTags")
-                           .HasOne(typeof(Tag)).WithMany().HasForeignKey("TagId").OnDelete(DeleteBehavior.Cascade),
-                           j => j.HasOne(typeof(FileRecord)).WithMany().HasForeignKey("FileId").OnDelete(DeleteBehavior.Cascade));
-
                 entity.HasIndex(f => f.Name);
                 entity.HasIndex(f => new { f.Path, f.Name });
+
+                entity.HasMany(fr => fr.Tags)
+                      .WithMany(t => t.Files)
+                      .UsingEntity<FileTag>(
+                            l => l.HasOne(ft => ft.Tag)
+                                  .WithMany()
+                                  .HasForeignKey(ft => ft.TagId)
+                                  .OnDelete(DeleteBehavior.Cascade),
+                            r => r.HasOne(ft => ft.File)
+                                  .WithMany()
+                                  .HasForeignKey(ft => ft.FileId)
+                                  .OnDelete(DeleteBehavior.Cascade),
+                            j =>
+                            {
+                                j.ToTable("FileTags");
+                                j.HasKey(ft => new { ft.FileId, ft.TagId });
+                            }
+                      );
             });
 
             modelBuilder.Entity<Tag>().Ignore(t => t.IsSelected);

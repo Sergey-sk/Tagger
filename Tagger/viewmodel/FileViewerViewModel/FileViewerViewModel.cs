@@ -1,16 +1,16 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using GongSolutions.Wpf.DragDrop;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Windows;
-using System.Windows.Controls;
 using Tagger.messages;
 using Tagger.model;
+using Tagger.services;
+using Tagger.services.Drag_Drop;
 using Tagger.services.interfaces;
 
-//все о файлах - поиск открытие, любое взаимодействие, d&d на тег
 namespace Tagger.viewmodel.FileViewerViewModel
 {
     public partial class FileViewerViewModel : ObservableObject,
@@ -19,31 +19,38 @@ namespace Tagger.viewmodel.FileViewerViewModel
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IDialogService _dialogService;
+        private readonly IFileService _fileService;
+
+        public IDragSource DragHandler { get; }
+        public IDropTarget DropHandler { get; }
 
         private string _currentActivePath;
         private CancellationTokenSource? _folderCts;
         private CancellationTokenSource? _searchCts;
         private bool _isLoading;
         private List<FileRecord> _cachedFiles = [];
+        private List<Tag> _selectedTags = [];
 
         [ObservableProperty]
         private ObservableCollection<FileRecord> _files;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsSearching))]
         [NotifyCanExecuteChangedFor(nameof(TriggerSearchWithDebounceCommand))]
         private string _currentSearchText;
 
         public ObservableCollection<FileRecord> SelectedFiles { get; set; } = [];
 
-        private List<string> _selectedTagNames = new();
+        public bool IsSearching => !string.IsNullOrWhiteSpace(CurrentSearchText) || _selectedTags.Count > 0;
 
-        public FileViewerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory, IDialogService dialogService)
+        public FileViewerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory, IDialogService dialogService, IFileService fileService)
         {
             _contextFactory = contextFactory;
             _dialogService = dialogService;
+            _fileService = fileService;
 
-            WeakReferenceMessenger.Default.Register<FolderChangedMessage>(this);
-            WeakReferenceMessenger.Default.Register<FilesScannedBatchMessage>(this);
+            DragHandler = new FileDragHandler(dialogService);
+            DropHandler = new FileDropHandler();
 
             _currentActivePath = Properties.Settings.Default.FolderPath;
 
@@ -52,6 +59,9 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 var currentSelection = SelectedFiles.ToList();
                 WeakReferenceMessenger.Default.Send(new SelectedItemsChangedMessage(currentSelection));
             };
+
+            WeakReferenceMessenger.Default.Register<FolderChangedMessage>(this);
+            WeakReferenceMessenger.Default.Register<FilesScannedBatchMessage>(this);
 
             WeakReferenceMessenger.Default.Register<ApplySavedSearchMessage>(this, async (r, message) =>
             {
@@ -65,39 +75,19 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             WeakReferenceMessenger.Default.Register<ApplyTagToSearch>(this, async (r, message) =>
             {
-                _selectedTagNames = message.tags;
+                _selectedTags = message.tags;
+                OnPropertyChanged(nameof(IsSearching));
                 await TriggerSearchWithDebounceAsync();
             });
 
             WeakReferenceMessenger.Default.Register<ApplyTagMessage>(this, async (r, message) =>
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-
-                var tag = await context.Tags
-                    .FirstOrDefaultAsync(t => t.Id == message.tagId);
-
-                if (tag == null) return;
-
-                List<FileRecord> taggedFiles = _cachedFiles
-                    .Where(f => message.fileIds.Contains(f.Id)).ToList();
-
-                foreach(var file in taggedFiles)
-                {
-                    file.Tags.Add(tag);
-                }
-
-                await TriggerSearchWithDebounceAsync();
-            });
+                await OnApplyTag(message));
 
             WeakReferenceMessenger.Default.Register<RemoveTagMessage>(this, async (r, message) =>
-            {
-                foreach (var file in _cachedFiles)
-                    file.Tags.RemoveAll(t => t.Name == message.tagName);
+                await OnRemoveTag(message));
 
-                _selectedTagNames.Remove(message.tagName);
-
-                await TriggerSearchWithDebounceAsync();
-            });
+            WeakReferenceMessenger.Default.Register<ExecuteFileDrop>(this, async (r, message) =>
+                await ApplyTagsToFilesAsync(message.fileId, message.tags));
         }
 
         private async Task OnScanStateChanged(ScanStateChangedMessage message)
@@ -110,12 +100,17 @@ namespace Tagger.viewmodel.FileViewerViewModel
                     case ScanStatus.CanceledByFolderChange:
                         Files?.Clear();
                         _cachedFiles.Clear();
+                        _isLoading = true;
                         break;
 
                     case ScanStatus.CanceledByUser:
+                        _isLoading = false;
                         break;
 
                     case ScanStatus.Finished:
+                        _isLoading = false;
+
+                        if (IsSearching) return;
                         _folderCts?.Cancel();
                         _folderCts = new CancellationTokenSource();
                         var token = _folderCts.Token;
@@ -134,14 +129,45 @@ namespace Tagger.viewmodel.FileViewerViewModel
             }
         }
 
-        [RelayCommand]
-        private async Task LoadOnStart()
+        /// <summary>
+        /// Вызывается при перетаскивании файла на тег или применении файла к тегу
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private async Task OnApplyTag(ApplyTagMessage message)
         {
-            _folderCts?.Cancel();
-            _folderCts = new CancellationTokenSource();
-            var token = _folderCts.Token;
+            var savedTag = await _fileService.ApplyFilesToTagsAsync(message.tagId, message.fileIds);
+            if (savedTag == null) return;
 
-            await LoadFilesAsync(_currentActivePath, token);
+            var fileIdsSet = message.fileIds.ToHashSet();
+
+            List<FileRecord> uiFiles = _cachedFiles
+                .Where(f => fileIdsSet.Contains(f.Id))
+                .ToList();
+
+            foreach (var uiFile in uiFiles)
+            {
+                if (!uiFile.Tags.Any(t => t.Id == message.tagId))
+                    uiFile.Tags.Add(savedTag);
+            }
+
+            await TriggerSearchWithDebounceAsync();
+        }
+
+        private async Task OnRemoveTag(RemoveTagMessage message)
+        {
+            foreach (var file in _cachedFiles)
+                file.Tags.RemoveAll(t => t.Id == message.tagId);
+
+            _selectedTags.RemoveAll(t => t.Id == message.tagId);
+            OnPropertyChanged(nameof(IsSearching));
+
+            await TriggerSearchWithDebounceAsync();
+        }
+
+        partial void OnCurrentSearchTextChanged(string value)
+        {
+            _ = TriggerSearchWithDebounceAsync();
         }
 
         private async Task LoadFilesAsync(string path, CancellationToken token)
@@ -158,56 +184,43 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             try
             {
-                using (var context = await _contextFactory.CreateDbContextAsync(token))
+                var initialFiles = await _fileService.LoadFirstBatchFilesAsync(path, token);
+
+                if (Files == null)
+                    Files = new ObservableCollection<FileRecord>(initialFiles);
+                else
                 {
+                    Files.Clear();
 
-                    var initialFiles = await context.Files
-                        .AsNoTracking()
-                        .Include(f => f.Tags)
-                        .Where(f => f.Path.StartsWith(path))
-                        .Take(3000)
-                        .ToListAsync(token);
-
-                    token.ThrowIfCancellationRequested();
-
-                    if (Files == null)
-                        Files = new ObservableCollection<FileRecord>(initialFiles);
-                    else
-                    {
-                        Files.Clear();
-
-                        foreach (var file in initialFiles)
-                            Files.Add(file);
-                    }
+                    foreach (var file in initialFiles)
+                        Files.Add(file);
                 }
 
-                _ = Task.Run(async () =>
+                try
                 {
-                    try
+                    var allFiles = await Task.Run(() => _fileService.LoadFilesForPathInBackgroundAsync(path, token), token);
+
+                    _cachedFiles.Clear();
+                    _cachedFiles.AddRange(allFiles);
+
+                    if (!string.IsNullOrEmpty(CurrentSearchText) || _selectedTags.Count > 0)
                     {
-                        using var bgContext = await _contextFactory.CreateDbContextAsync();
-
-                        var allFiles = await bgContext.Files
-                        .AsNoTracking()
-                        .Include(f => f.Tags)
-                        .Where(f => f.Path.StartsWith(path))
-                        .ToListAsync(token);
-
-                        _cachedFiles = allFiles;
-
-                        if(!string.IsNullOrEmpty(CurrentSearchText) || _selectedTagNames.Count > 0)
-                        {
-                            await Application.Current.Dispatcher.InvokeAsync(() => _ = TriggerSearchWithDebounceAsync());
-                        }
+                        await Application.Current.Dispatcher.InvokeAsync(() => _ = TriggerSearchWithDebounceAsync());
                     }
-                    catch (OperationCanceledException) { }
-                    catch (Exception ex)
-                    {
-                        _dialogService.ShowMessage($"Ошибка фонового потока: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }, token);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _dialogService.ShowMessage($"Ошибка фонового потока: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
 
-                WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Показаны первые 3 000 файлов. Уточните поиск."));
+                if (Files.Count == 0)
+                {
+                    WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Файлы не найдены. Просканируйте папку."));
+                    return;
+                }
+
+                WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, $"Показаны первые {Files.Count} файлов. Уточните поиск."));
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -222,45 +235,25 @@ namespace Tagger.viewmodel.FileViewerViewModel
         }
 
         [RelayCommand]
+        private async Task LoadOnStart()
+        {
+            _folderCts?.Cancel();
+            _folderCts = new CancellationTokenSource();
+            var token = _folderCts.Token;
+
+            await LoadFilesAsync(_currentActivePath, token);
+        }
+
+        [RelayCommand]
         private async Task TriggerSearchWithDebounceAsync()
         {
+            if (_isLoading && _cachedFiles.Count == 0) return;
+
             try
             {
-                _searchCts?.Cancel();
-                _searchCts = new CancellationTokenSource();
-                var token = _searchCts.Token;
+                List<int> tagIds = [.. _selectedTags.Select(t => t.Id)];
 
-                if (!string.IsNullOrEmpty(CurrentSearchText))
-                    await Task.Delay(150, token);
-
-                if (_cachedFiles.Count == 0) return;
-
-                IEnumerable<FileRecord> query = _cachedFiles
-                    .Where(f => f.Path.StartsWith(_currentActivePath));
-
-                if (_selectedTagNames.Count > 0)
-                {
-                    foreach (var tagName in _selectedTagNames)
-                    {
-                        query = query.Where(f => f.Tags.Any(t => t.Name == tagName));
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(CurrentSearchText))
-                {
-                    string[] keywords = CurrentSearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-                    foreach (var keyword in keywords)
-                    {
-                        query = query.Where(f => f.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                    }
-                }
-
-                token.ThrowIfCancellationRequested();
-
-                var resultFiles = query.Take(3000).ToList();
-
-                token.ThrowIfCancellationRequested();
+                var resultFiles = await _fileService.SearchWithDebounceAsync(CurrentSearchText, _cachedFiles, _currentActivePath, tagIds, _searchCts);
 
                 if (Files == null)
                     Files = new ObservableCollection<FileRecord>(resultFiles);
@@ -272,23 +265,51 @@ namespace Tagger.viewmodel.FileViewerViewModel
                         Files.Add(file);
                 }
 
-                WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, $"Найдено файлов: {resultFiles.Count}"));
-
                 if (!string.IsNullOrWhiteSpace(CurrentSearchText))
+                {
                     WeakReferenceMessenger.Default.Send(new SearchToSaveMessage(CurrentSearchText));
+                }
             }
-            catch (OperationCanceledException)
-            {
+            catch (OperationCanceledException) { }
+        }
 
+        /// <summary>
+        /// Вызывается при перетаскивании тега на файл
+        /// </summary>
+        /// <param name="fileId"></param>
+        /// <param name="tagIds"></param>
+        /// <returns></returns>
+        private async Task ApplyTagsToFilesAsync(int fileId, DraggedObjectsPackage<Tag> tags)
+        {
+            try
+            {
+                var tagIds = tags.Objects.Select(t => t.Id).ToList();
+
+                await _fileService.ApplyTagsToFilesAsync(fileId, tagIds);
+
+                await UpdateUiFiles(fileId, tags.Objects);
+
+                WeakReferenceMessenger.Default.Send(new ApplyFileMessage(fileId, tagIds));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private bool CanSearch() => !string.IsNullOrEmpty(CurrentSearchText) || _selectedTagNames.Count > 0;
-
-
-        partial void OnCurrentSearchTextChanged(string value)
+        private async Task UpdateUiFiles(int fileId, List<Tag> tagsToAdd)
         {
-            _ = TriggerSearchWithDebounceAsync();
+            var fileInUi = Files.FirstOrDefault(f => f.Id == fileId);
+            if (fileInUi != null)
+            {
+                foreach (var tag in tagsToAdd)
+                {
+                    if (!fileInUi.Tags.Any(f => f.Id == tag.Id))
+                        fileInUi.Tags.Add(tag);
+                }
+            }
+
+            await TriggerSearchWithDebounceAsync();
         }
 
         public async void Receive(FolderChangedMessage message)
@@ -301,11 +322,11 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 _folderCts = new CancellationTokenSource();
                 var token = _folderCts.Token;
 
-                _selectedTagNames.Clear();
+                _selectedTags.Clear();
                 SelectedFiles.Clear();
                 _cachedFiles.Clear();
 
-                if(CurrentSearchText != null) CurrentSearchText = string.Empty;
+                if (CurrentSearchText != null) CurrentSearchText = string.Empty;
                 await LoadFilesAsync(message.newPath, token);
             }
             catch (Exception ex)
@@ -322,213 +343,20 @@ namespace Tagger.viewmodel.FileViewerViewModel
             {
                 Files?.Clear();
                 _cachedFiles.Clear();
+                return;
             }
 
-            foreach (var file in newFiles)
+            _cachedFiles.AddRange(newFiles);
+
+            if (IsSearching)
             {
-                if (Files?.Count < 3000) Files.Add(file);
-                _cachedFiles.Add(file);
+                _ = TriggerSearchWithDebounceAsync();
+            }
+            else
+            {
+                foreach (var file in newFiles)
+                    if (Files?.Count < 3000) Files.Add(file);
             }
         }
     }
 }
-//private async Task LoadFilesForPath(string path)
-//{
-//    if (string.IsNullOrEmpty(path) || path == "Не выбрана")
-//    {
-//        if (Files == null) Files = new ObservableCollection<FileRecord>();
-//        _cachedFiles.Clear();
-//        return;
-//    }
-
-//    _currentSessionId++;
-//    int loadSessionId = _currentSessionId;
-//    _globalCts?.Cancel();
-//    _globalCts = new CancellationTokenSource();
-//    var token = _globalCts.Token;
-//    _isLoading = true;
-//    _hasPendingFilter = false;
-
-//    try
-//    {
-//        using var context = await _contextFactory.CreateDbContextAsync(token);
-
-//        var totalCount = await context.Files
-//            .AsNoTracking()
-//            .Where(f => f.Path.StartsWith(path))
-//            .CountAsync();
-
-//        if (totalCount == 0)
-//        {
-//            Files = new();
-//            _cachedFiles.Clear();
-//            return;
-//        }
-
-//        var initialFiles = await context.Files
-//            .AsNoTracking()
-//            .Include(f => f.Tags)
-//            .Where(f => f.Path.StartsWith(path))
-//            .Take(101)
-//            .ToListAsync(token);
-
-//        bool hasMoreFiles = initialFiles.Count > 100;
-
-//        var firstChunk = hasMoreFiles
-//            ? initialFiles.Take(100).ToList()
-//            : initialFiles;
-
-//        _cachedFiles = [.. firstChunk];
-
-//        Files = new ObservableCollection<FileRecord>(firstChunk);
-
-//        if (hasMoreFiles)
-//        {
-//            _ = Task.Run(async () =>
-//            {
-//                try
-//                {
-//                    using var bgContext = await _contextFactory.CreateDbContextAsync(token);
-
-//                    var fileStream = bgContext.Files
-//                        .AsNoTracking()
-//                        .Include(f => f.Tags)
-//                        .Where(f => f.Path.StartsWith(path))
-//                        .Skip(100)
-//                        .AsAsyncEnumerable();
-
-//                    var currentChunk = new List<FileRecord>();
-//                    int ChunkSize = totalCount > 10000 ? 2000 : 500;
-
-//                    await foreach (var file in fileStream.WithCancellation(token))
-//                    {
-//                        if (token.IsCancellationRequested || loadSessionId != _currentSessionId)
-//                            return;
-
-//                        currentChunk.Add(file);
-
-//                        if (currentChunk.Count >= ChunkSize)
-//                        {
-//                            var chunkToSend = currentChunk;
-//                            currentChunk = new List<FileRecord>();
-
-//                            if (loadSessionId != _currentSessionId) return;
-
-//                            _cachedFiles.AddRange(chunkToSend);
-
-//                            await Application.Current.Dispatcher.InvokeAsync(() =>
-//                            {
-//                                if (loadSessionId != _currentSessionId) return;
-
-//                                foreach (var f in chunkToSend)
-//                                    Files.Add(f);
-//                            }, System.Windows.Threading.DispatcherPriority.Background);
-
-//                            await Task.Delay(10);
-//                        }
-//                    }
-
-//                    if (currentChunk.Count > 0 && !token.IsCancellationRequested && loadSessionId == _currentSessionId)
-//                    {
-//                        _cachedFiles.AddRange(currentChunk);
-
-//                        await Application.Current.Dispatcher.InvokeAsync(() =>
-//                        {
-//                            if (loadSessionId != _currentSessionId) return;
-
-//                            foreach (var f in currentChunk)
-//                                Files.Add(f);
-//                        }, System.Windows.Threading.DispatcherPriority.Background);
-//                    }
-//                }
-//                catch (OperationCanceledException) { }
-//            }, token);
-//        }
-//    }
-//    catch (OperationCanceledException) { }
-//    catch (Exception ex)
-//    {
-//        _dialogService.ShowMessage($"Ошибка загрузки файлов: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-//    }
-//    finally
-//    {
-//        _isLoading = false;
-//        if (_hasPendingFilter)
-//        {
-//            _hasPendingFilter = false;
-//            ApplyFiltersInternal();
-//        }
-//    }
-//}
-
-//TODO: Зависает строка поиск при вводе/стирании первых букв
-//TODO: При показе файлов с тегами (фильтр через сохраненный поиск или теги) и переходе на след папку сканирование файлов тормозит
-//TODO: при загрузке список меняет значения
-
-//[RelayCommand(CanExecute = nameof(CanApplyFilters))]
-//private void ApplyFilters()
-//{
-//    if (_isLoading)
-//    {
-//        _hasPendingFilter = true;
-//        return;
-//    }
-
-//    ApplyFiltersInternal();
-//}
-
-//private void ApplyFiltersInternal()
-//{
-//    if (string.IsNullOrWhiteSpace(CurrentSearchText) && _selectedTagNames.Count == 0)
-//    {
-//        if (Files != null && Files.Count == _cachedFiles.Count)
-//            return;
-
-//        lock (_cacheLock)
-//        {
-//            if (Files != null)
-//            {
-//                Files.Clear();
-//                foreach (var file in _cachedFiles)
-//                    Files.Add(file);
-//            }
-//            else
-//                Files = new ObservableCollection<FileRecord>(_cachedFiles);
-//        }
-
-//        return;
-//    }
-
-//    _currentSessionId++;
-//    _globalCts?.Cancel();
-
-//    lock (_cacheLock)
-//    {
-//        IEnumerable<FileRecord> query = _cachedFiles.ToList();
-
-//        if (_selectedTagNames.Count > 0)
-//        {
-//            query = query.Where(f => _selectedTagNames.All(selectedTag =>
-//                f.Tags.Any(t => t.Name.Equals(selectedTag, StringComparison.OrdinalIgnoreCase))));
-//        }
-
-//        if (!string.IsNullOrWhiteSpace(CurrentSearchText))
-//        {
-//            string[] keywords = CurrentSearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-//            query = query.Where(f => keywords.All(keyword =>
-//                f.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
-//        }
-
-//        if (Files != null)
-//        {
-//            Files.Clear();
-
-//            foreach (var file in query)
-//                Files.Add(file);
-//        }
-//        else
-//            Files = new ObservableCollection<FileRecord>(query);
-
-//        WeakReferenceMessenger.Default.Send(new SearchToSaveMessage(CurrentSearchText));
-//    }
-//}

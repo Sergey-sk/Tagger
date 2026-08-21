@@ -17,12 +17,18 @@ namespace Tagger.viewmodel
         [ObservableProperty]
         private string _currentTheme = "System";
 
-        public MainViewModel(IDialogService dialogService, IDbContextFactory<ApplicationDbContext> contextFactory)
+        public MainViewModel(IDialogService dialogService,
+                             IDbContextFactory<ApplicationDbContext> contextFactory,
+                             ITagService tagService,
+                             IFileIndexingService fileIndexingService,
+                             IScanningService scanningService,
+                             ISavedSearchService savedSearchService,
+                             IFileService fileService)
         {
-            FileViewer = new FileViewerViewModel.FileViewerViewModel(contextFactory, dialogService);
-            Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, contextFactory);
-            Scanner = new ScannerViewModel.ScannerViewModel(contextFactory, dialogService);
-            TagManager = new TagManagerViewModel.TagManagerViewModel(contextFactory, dialogService);
+            FileViewer = new FileViewerViewModel.FileViewerViewModel(contextFactory, dialogService, fileService);
+            Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService);
+            Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService);
+            TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService);
 
             CurrentTheme = Properties.Settings.Default.Theme;
         }

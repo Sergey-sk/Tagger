@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:Tagger.view"
              xmlns:nmsp="clr-namespace:Tagger.viewmodel"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:dd="urn:gong-wpf-dragdrop"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -24,6 +25,25 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
         </Style>
+
+        <DataTemplate x:Key="FileDragTemplate">
+            <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                    BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="8,4">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8A5;"
+                               FontFamily="{StaticResource SymbolThemeFontFamily}"
+                               VerticalAlignment="Center"/>
+
+                    <TextBlock Text="{Binding Count, StringFormat=' ({0})'}"
+                               VerticalAlignment="Center"
+                               Margin="5,0,0,0"
+                               FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Border Margin="10"
@@ -53,12 +73,20 @@
                       HorizontalAlignment="Stretch"
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Recycling"
-                      VirtualizingPanel.ScrollUnit="Pixel">
+                      VirtualizingPanel.ScrollUnit="Pixel"
+                      Tag="{Binding RelativeSource={RelativeSource Self}}"
+                      dd:DragDrop.IsDragSource="True"
+                      dd:DragDrop.IsDropTarget="True"
+                      dd:DragDrop.DragHandler="{Binding FileViewer.DragHandler}"
+                      dd:DragDrop.DropHandler="{Binding FileViewer.DropHandler}"
+                      dd:DragDrop.UseDefaultDragAdorner="False"
+                      dd:DragDrop.DragAdornerTranslation="10,10"
+                      dd:DragDrop.DragAdornerTemplate="{StaticResource FileDragTemplate}">
 
                 <i:Interaction.Behaviors>
                     <nmsp:MultiSelectionBehavior SelectedItems="{Binding FileViewer.SelectedFiles}"/>
                 </i:Interaction.Behaviors>
-                
+
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
                         <Setter Property="Padding" Value="5,6"/>

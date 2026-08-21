@@ -32,6 +32,12 @@ namespace Tagger
                     services.AddSingleton<IDialogService, DialogService>();
                     services.AddSingleton<MainViewModel>();
 
+                    services.AddSingleton<ITagService, TagService>();
+                    services.AddSingleton<IFileIndexingService, FileIndexingService>();
+                    services.AddSingleton<IScanningService, ScanningService>();
+                    services.AddSingleton<ISavedSearchService, SavedSearchService>();
+                    services.AddSingleton<IFileService, FileService>();
+
                     services.AddSingleton<MainWindow>();
                 })
                 .Build();

@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Tagger.view.LeftSideBarView"
+﻿    <UserControl x:Class="Tagger.view.LeftSideBarView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -7,6 +7,7 @@
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:nmsp="clr-namespace:Tagger.viewmodel"
+             xmlns:dd="urn:gong-wpf-dragdrop"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -172,6 +173,25 @@
                 <TextBlock Text="{Binding QueryText}" VerticalAlignment="Center"/>
             </StackPanel>
         </DataTemplate>
+
+        <DataTemplate x:Key="TagDragTemplate">
+            <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                    BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="8,4">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8EC;"
+                               FontFamily="{StaticResource SymbolThemeFontFamily}"
+                               VerticalAlignment="Center"/>
+
+                    <TextBlock Text="{Binding Count, StringFormat=' ({0})'}"
+                               VerticalAlignment="Center"
+                               Margin="5,0,0,0"
+                               FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Border Margin="10"
@@ -288,7 +308,15 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          VirtualizingPanel.IsVirtualizing="True"
                          VirtualizingPanel.VirtualizationMode="Recycling"
-                         VirtualizingPanel.ScrollUnit="Pixel">
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         
+                         dd:DragDrop.IsDropTarget="True"
+                         dd:DragDrop.IsDragSource="True"
+                         dd:DragDrop.DropHandler="{Binding TagManager.DropHandler}"
+                         dd:DragDrop.DragHandler="{Binding TagManager.DragHandler}"
+                         dd:DragDrop.UseDefaultDragAdorner="False"
+                         dd:DragDrop.DragAdornerTranslation="10,10"
+                         dd:DragDrop.DragAdornerTemplate="{StaticResource TagDragTemplate}">
 
                     <i:Interaction.Behaviors>
                         <nmsp:MultiSelectionBehavior SelectedItems="{Binding TagManager.SelectedTags}"/>
@@ -317,7 +345,7 @@
                                 <Setter.Value>
                                     <ContextMenu>
                                         <MenuItem Header="Применить к выделенным файлам"
-                                                  Command="{Binding PlacementTarget.Tag.ApplyToSelectedFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Command="{Binding PlacementTarget.Tag.ApplyTagToFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding Path=Id}"/>
                                         <MenuItem Header="Удалить"
                                                   Command="{Binding PlacementTarget.Tag.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
