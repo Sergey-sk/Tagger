@@ -16,8 +16,7 @@ namespace Tagger.services.interfaces
             string path,
             List<int> tagIds,
             CancellationTokenSource? searchCts);
-        public Task<Tag?> ApplyFilesToTagsAsync(int tagId, List<int> fileIds);
-
-        Task ApplyTagsToFilesAsync(int fileId, List<int> tagIds);
+        Task<List<Tag>> GetTagsByIds(List<int> tagIds);
+        Task<Tag?> GetTagByIdAsync(int tagId);
     }
 }

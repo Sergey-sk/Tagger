@@ -362,7 +362,7 @@
                                             BorderThickness="{TemplateBinding BorderThickness}"
                                             BorderBrush="{TemplateBinding BorderBrush}"
                                             Padding="{TemplateBinding Padding}"
-                                            CornerRadius="4">                                            
+                                            CornerRadius="4">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
@@ -377,7 +377,7 @@
                                                            ToolTip="{Binding Name}"
                                                            Margin="0,0,4,0"/>
                                                 <TextBlock Grid.Column="1"
-                                                           Text="{Binding Files.Count, StringFormat='({0})'}"
+                                                           Text="{Binding FilesCount, StringFormat='({0})'}"
                                                            VerticalAlignment="Center"
                                                            HorizontalAlignment="Center"
                                                            FontWeight="SemiBold"
@@ -401,21 +401,6 @@
                             </Setter>
                         </Style>
                     </ListBox.ItemContainerStyle>
-
-                    <!--<ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   TextAlignment="Center">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="{}{0} ({1})">
-                                    <Binding Path="Name"/>
-                                    <Binding Path="Files.Count"/>
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>-->
                 </ListBox>
             </Grid>
         </Grid>

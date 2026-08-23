@@ -82,107 +82,20 @@ namespace Tagger.services.implementations
             return result;
         }
 
-        /// <summary>
-        /// Вызывается при перетаскивании или применении файла к тегу
-        /// </summary>
-        /// <param name="tagId"></param>
-        /// <param name="fileIds"></param>
-        /// <returns></returns>
-        public async Task<Tag?> ApplyFilesToTagsAsync(int tagId, List<int> fileIds)
+        public async Task<List<Tag>> GetTagsByIds(List<int> tagIds)
         {
-            if (fileIds == null || fileIds.Count == 0) return null;
-
             using var context = await _contextFactory.CreateDbContextAsync();
+            var setIds = tagIds.ToHashSet();
 
-            var tag = await context.Tags
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(t => t.Id == tagId);
-
-            if (tag == null) return null;
-
-
-            const int batchSize = 5000;
-            for (int i = 0; i < fileIds.Count; i += batchSize)
-            {
-                var batchIds = fileIds.Skip(i).Take(batchSize).ToList();
-
-                var taggedFileIds = await context.FileTags
-                    .AsNoTracking()
-                    .Where(ft => ft.TagId == tagId && batchIds.Contains(ft.FileId))
-                    .Select(ft => ft.FileId)
-                    .ToListAsync();
-
-                var newIdsForTag = batchIds.Except(taggedFileIds).ToList();
-
-                if (newIdsForTag.Count > 0)
-                {
-                    var newFileTags = newIdsForTag.Select(fileId => new FileTag
-                    {
-                        TagId = tagId,
-                        FileId = fileId,
-                    });
-
-                    context.FileTags.AddRange(newFileTags);
-                }
-            }
-
-            await context.SaveChangesAsync();
-            await Task.Delay(10);
-
-            return tag;
+            return await context.Tags
+                .Where(t => setIds.Contains(t.Id))
+                .ToListAsync();
         }
 
-        /// <summary>
-        /// Вызывается при перетаскивании тега на файл
-        /// </summary>
-        /// <param name="fileId"></param>
-        /// <param name="tagIds"></param>
-        /// <returns></returns>
-        public async Task ApplyTagsToFilesAsync(int fileId, List<int> tagIds)
+        public async Task<Tag?> GetTagByIdAsync(int tagId)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
-
-            var fileExist = await context.Files
-                .AnyAsync(f => f.Id == fileId);
-
-            if (!fileExist) return;
-
-            var uniqueIncomingIds = tagIds.Distinct().ToList();
-
-            var attachedTagIds = await context.FileTags
-                .Where(ft => ft.FileId == fileId)
-                .Select(ft => ft.TagId)
-                .ToListAsync();
-
-            var existingIdsSet = attachedTagIds.ToHashSet();
-
-            var newTagIds = uniqueIncomingIds
-                .Where(id => !existingIdsSet.Contains(id))
-                .ToList();
-
-            if (newTagIds.Count == 0) return;
-
-            const int BatchSize = 3000;
-
-            for (int i = 0; i < newTagIds.Count; i += BatchSize)
-            {
-                var currentBatch = newTagIds.Skip(i).Take(BatchSize);
-
-                var entriesToAdd = new List<FileTag>();
-
-                foreach (var tagId in currentBatch)
-                {
-                    var link = new FileTag()
-                    {
-                        TagId = tagId,
-                        FileId = fileId,
-                    };
-                    entriesToAdd.Add(link);
-                }
-
-                await context.FileTags.AddRangeAsync(entriesToAdd);
-                await context.SaveChangesAsync();
-            }
+            var tags = await GetTagsByIds([tagId]);
+            return tags.FirstOrDefault();
         }
     }
 }

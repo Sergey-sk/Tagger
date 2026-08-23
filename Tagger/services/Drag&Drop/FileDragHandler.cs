@@ -1,5 +1,6 @@
 ﻿using GongSolutions.Wpf.DragDrop;
 using System.Windows;
+using Tagger.dto;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.services.interfaces;
@@ -17,9 +18,9 @@ namespace Tagger.services
 
         public void StartDrag(IDragInfo dragInfo)
         {
-            var selectedItems = dragInfo.SourceItems.Cast<FileRecord>().ToList();
+            var selectedItems = dragInfo.SourceItems.Cast<FileItemViewModel>().ToList();
 
-            dragInfo.Data = new DraggedObjectsPackage<FileRecord>
+            dragInfo.Data = new DraggedObjectsPackage<FileItemViewModel>
             {
                 Count = selectedItems.Count,
                 Objects = selectedItems
@@ -32,7 +33,7 @@ namespace Tagger.services
         {
             if (dragInfo.SourceItem == null) return false;
 
-            if (!(dragInfo.SourceItem is FileRecord)) return false;
+            if (!(dragInfo.SourceItem is FileItemViewModel)) return false;
 
             return true;
         }

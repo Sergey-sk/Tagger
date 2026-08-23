@@ -37,6 +37,7 @@ namespace Tagger
                     services.AddSingleton<IScanningService, ScanningService>();
                     services.AddSingleton<ISavedSearchService, SavedSearchService>();
                     services.AddSingleton<IFileService, FileService>();
+                    services.AddSingleton<IFileTagService, FileTagService>();
 
                     services.AddSingleton<MainWindow>();
                 })
@@ -49,13 +50,13 @@ namespace Tagger
             {
                 await _host.StartAsync();
 
-                //var contextFactory = _host.Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+                var contextFactory = _host.Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
 
-                //using (var context = await contextFactory.CreateDbContextAsync())
-                //{
-                //    await context.Database.EnsureDeletedAsync();
-                //    await context.Database.EnsureCreatedAsync();
-                //}
+                using (var context = await contextFactory.CreateDbContextAsync())
+                {
+                    await context.Database.EnsureDeletedAsync();
+                    await context.Database.EnsureCreatedAsync();
+                }
 
                 var mainWindow = _host.Services.GetRequiredService<MainWindow>();
                 mainWindow.Show();

@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
+using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services;
@@ -18,12 +19,13 @@ namespace Tagger.viewmodel.TagManagerViewModel
         private readonly IDialogService _dialogService;
         private readonly ITagService _tagService;
         private readonly IFileIndexingService _fileIndexingService;
+        private readonly IFileTagService _fileTagService;
 
         public IDragSource DragHandler { get; }
         public IDropTarget DropHandler { get; }
 
         [ObservableProperty]
-        private ObservableCollection<Tag> _tags;
+        private ObservableCollection<TagItemViewModel> _tags;
 
         [ObservableProperty]
         private string _searchText;
@@ -31,9 +33,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
         [ObservableProperty]
         private ICollectionView? _tagsView;
 
-        public ObservableCollection<Tag> SelectedTags { get; set; } = [];
+        public ObservableCollection<TagItemViewModel> SelectedTags { get; set; } = [];
 
-        private List<FileRecord> _selectedFiles = [];
+        private List<FileItemViewModel> _selectedFiles = [];
 
         public string CurrentFilterStr
         {
@@ -47,11 +49,13 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
         public TagManagerViewModel(IDialogService dialogService,
                                    ITagService tagService,
-                                   IFileIndexingService fileIndexingService)
+                                   IFileIndexingService fileIndexingService,
+                                   IFileTagService fileTagService)
         {
             _dialogService = dialogService;
             _tagService = tagService;
             _fileIndexingService = fileIndexingService;
+            _fileTagService = fileTagService;
 
             DragHandler = new TagDragHandler(dialogService);
             DropHandler = new TagDropHandler();
@@ -86,11 +90,14 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
             WeakReferenceMessenger.Default.Register<RemoveSelectedTag>(this, (r, message) =>
             {
-                foreach(var tag in message.tagsToRemove)
+                foreach (var tag in message.tagsToRemove)
                 {
                     SelectedTags.Remove(tag);
                 }
             });
+
+            WeakReferenceMessenger.Default.Register<RequestUiTagsDictionaryMessage>(this, (r, message) =>
+                OnRequestUiTagsDictionary(message));
         }
 
         /// <summary>
@@ -100,27 +107,32 @@ namespace Tagger.viewmodel.TagManagerViewModel
         /// <returns></returns>
         private async Task OnApplyFile(ApplyFileMessage message)
         {
-            var savedFile = await _tagService.ApplyTagsToFilesAsync(message.fileId, message.tagIds);
-            if (savedFile == null) return;
+            var addedTagIdsSet = message.tagIds.ToHashSet();
 
             var tagIdsSet = message.tagIds.ToHashSet();
 
-            List<Tag> uiTags = Tags
+            List<TagItemViewModel> uiTags = Tags
                 .Where(t => tagIdsSet.Contains(t.Id))
                 .ToList();
 
             foreach (var uiTag in uiTags)
             {
-                if (!uiTag.Files.Any(f => f.Id == message.fileId))
-                    uiTag.Files.Add(savedFile);
+                if (addedTagIdsSet.Contains(uiTag.Id))
+                    uiTag.IncrementFilesCount();
             }
 
-            var sorted = Tags.OrderByDescending(t => t.Files.Count).ToList();
+            var sorted = Tags.OrderByDescending(t => t.FilesCount).ToList();
             Tags.Clear();
             foreach (var tag in sorted)
                 Tags.Add(tag);
 
             TagsView?.Refresh();
+        }
+
+        private void OnRequestUiTagsDictionary(RequestUiTagsDictionaryMessage message)
+        {
+            var tagsDictionary = Tags.ToDictionary(t => t.Id);
+            message.Reply(tagsDictionary);
         }
 
         private void ResetSelectedTags()
@@ -157,7 +169,8 @@ namespace Tagger.viewmodel.TagManagerViewModel
             {
                 SelectedTags.Clear();
                 var tags = await _tagService.LoadTagsAsync();
-                Tags = new ObservableCollection<Tag>(tags);
+                var viewModelTags = tags.Select(t => new TagItemViewModel(t));
+                Tags = new ObservableCollection<TagItemViewModel>(viewModelTags);
 
                 TagsView = CollectionViewSource.GetDefaultView(Tags);
                 TagsView.Filter = FilterTags;
@@ -174,12 +187,13 @@ namespace Tagger.viewmodel.TagManagerViewModel
             try
             {
                 var newTag = await _tagService.CreateTagAsync(SearchText.Trim());
+                var viewModelTag = new TagItemViewModel(newTag);
 
-                Tags.Add(newTag);
+                Tags.Add(viewModelTag);
 
-                if (!SelectedTags.Contains(newTag))
+                if (!SelectedTags.Contains(viewModelTag))
                 {
-                    SelectedTags.Add(newTag);
+                    SelectedTags.Add(viewModelTag);
                     OnPropertyChanged(nameof(CurrentFilterStr));
                 }
 
@@ -240,9 +254,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
             {
                 var selectedFileIds = _selectedFiles.Select(f => f.Id).ToList();
 
-                await _tagService.ApplyFilesToTagsAsync(tagId, selectedFileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagId, selectedFileIds);
 
-                UpdateUiTags(tagId, _selectedFiles);
+                UpdateUiTags(tagId, newFileIds.Count);
 
                 WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, selectedFileIds));
             }
@@ -252,19 +266,18 @@ namespace Tagger.viewmodel.TagManagerViewModel
             }
         }
 
-        private void UpdateUiTags(int tagId, List<FileRecord> filesToAdd)
+        private void UpdateUiTags(int tagId, int filesCount)
         {
             var tagInUi = Tags.FirstOrDefault(t => t.Id == tagId);
             if (tagInUi != null)
             {
-                foreach (var file in filesToAdd)
+                for (int i = 0; i < filesCount; i++)
                 {
-                    if (!tagInUi.Files.Any(f => f.Id == file.Id))
-                        tagInUi.Files.Add(file);
+                    tagInUi.IncrementFilesCount();
                 }
             }
 
-            var sorted = Tags.OrderByDescending(t => t.Files.Count).ToList();
+            var sorted = Tags.OrderByDescending(t => t.FilesCount).ToList();
             Tags.Clear();
             foreach (var tag in sorted)
                 Tags.Add(tag);
@@ -288,11 +301,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
                 var fileIds = await _fileIndexingService.AddFilesFromPathAsync(filePaths.ToList(), progress);
 
-                await _tagService.ApplyFilesToTagsAsync(tagId, fileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagId, fileIds);
 
-                var files = await _tagService.GetFilesByIdsAsync(fileIds);
-
-                UpdateUiTags(tagId, files);
+                UpdateUiTags(tagId, newFileIds.Count);
 
                 isOperationActive = false;
 

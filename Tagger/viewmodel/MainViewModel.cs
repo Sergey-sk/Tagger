@@ -23,12 +23,13 @@ namespace Tagger.viewmodel
                              IFileIndexingService fileIndexingService,
                              IScanningService scanningService,
                              ISavedSearchService savedSearchService,
-                             IFileService fileService)
+                             IFileService fileService,
+                             IFileTagService fileTagService)
         {
-            FileViewer = new FileViewerViewModel.FileViewerViewModel(contextFactory, dialogService, fileService);
+            FileViewer = new FileViewerViewModel.FileViewerViewModel(contextFactory, dialogService, fileService, fileTagService);
             Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService);
             Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService);
-            TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService);
+            TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService, fileTagService);
 
             CurrentTheme = Properties.Settings.Default.Theme;
         }

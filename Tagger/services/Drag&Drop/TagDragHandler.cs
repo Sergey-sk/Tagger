@@ -5,6 +5,7 @@ using Tagger.messages;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.services.interfaces;
+using Tagger.viewmodel;
 
 namespace Tagger.services
 {
@@ -19,9 +20,9 @@ namespace Tagger.services
 
         public void StartDrag(IDragInfo dragInfo)
         {
-            var selectedTags = dragInfo.SourceItems.Cast<Tag>().ToList();
+            var selectedTags = dragInfo.SourceItems.Cast<TagItemViewModel>().ToList();
 
-            dragInfo.Data = new DraggedObjectsPackage<Tag>
+            dragInfo.Data = new DraggedObjectsPackage<TagItemViewModel>
             {
                 Count = selectedTags.Count,
                 Objects = selectedTags
@@ -36,7 +37,7 @@ namespace Tagger.services
         {
             if (dragInfo.SourceItem == null) return false;
 
-            if (!(dragInfo.SourceItem is Tag)) return false;
+            if (!(dragInfo.SourceItem is TagItemViewModel)) return false;
 
             return true;
         }

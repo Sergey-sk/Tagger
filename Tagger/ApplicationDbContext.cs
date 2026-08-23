@@ -60,8 +60,6 @@ namespace Tagger
                             }
                       );
             });
-
-            modelBuilder.Entity<Tag>().Ignore(t => t.IsSelected);
         }
     }
 }

@@ -2,8 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Tagger.dto;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
+using Tagger.viewmodel;
 
 namespace Tagger.messages
 {
@@ -17,22 +19,23 @@ namespace Tagger.messages
 
     public record ApplySavedSearchMessage(SavedSearch search);
 
-    public record ApplyTagToSearch(List<Tag> tags);
+    public record ApplyTagToSearch(List<TagItemViewModel> tags);
 
-    public record SelectedItemsChangedMessage(List<FileRecord> selectedItems);
+    public record SelectedItemsChangedMessage(List<FileItemViewModel> selectedItems);
 
     public record ChangeProgressStatus(bool isLoading, string value);
 
     public record ApplyTagMessage(int tagId, List<int> fileIds);
+    public record ApplyFileMessage(int fileId, List<int> tagIds);
     public record RemoveTagMessage(int tagId);
 
-    public record ApplyFileMessage(int fileId, List<int> tagIds);
-
     public record ExecuteTagDrop(int tagId);
-    public record ExecuteFileDrop(int fileId, DraggedObjectsPackage<Tag> tags);
+    public record ExecuteFileDrop(int fileId, DraggedObjectsPackage<TagItemViewModel> tags);
     public record ExecuteExternalTagDrop(int tagId, string[] paths);
 
-    public record RemoveSelectedTag(List<Tag> tagsToRemove);
+    public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
+
+    public class RequestUiTagsDictionaryMessage : RequestMessage<Dictionary<int, TagItemViewModel>> { }
 
     public enum ScanStatus
     {

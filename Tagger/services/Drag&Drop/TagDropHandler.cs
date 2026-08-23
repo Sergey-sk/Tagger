@@ -4,9 +4,11 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
+using Tagger.viewmodel;
 
 namespace Tagger.services
 {
@@ -16,7 +18,7 @@ namespace Tagger.services
         {
             bool canDrop = false;
 
-            var targetTag = dropInfo.TargetItem as Tag;
+            var targetTag = dropInfo.TargetItem as TagItemViewModel;
             var tagsControl = dropInfo.VisualTarget as Selector;
 
             if (targetTag == null && tagsControl == null)
@@ -25,7 +27,7 @@ namespace Tagger.services
                 return;
             }
 
-            if (dropInfo.Data is DraggedObjectsPackage<FileRecord> files && files.Count > 0)
+            if (dropInfo.Data is DraggedObjectsPackage<FileItemViewModel> files && files.Count > 0)
                 canDrop = true;
 
             if (dropInfo.Data is DataObject data && data.ContainsFileDropList())
@@ -44,23 +46,23 @@ namespace Tagger.services
 
         public void Drop(IDropInfo dropInfo)
         {
-            var targetTag = dropInfo.TargetItem as Tag;
+            var targetTag = dropInfo.TargetItem as TagItemViewModel;
             if (targetTag == null) return;
 
-            var tagsToApply = new List<Tag>();
+            var tagsToApply = new List<TagItemViewModel>();
 
             if (dropInfo.VisualTarget is ListBox listBox &&
                 listBox.SelectedItems.Count > 1 &&
                 listBox.SelectedItems.Contains(targetTag))
             {
-                tagsToApply.AddRange(listBox.SelectedItems.Cast<Tag>());
+                tagsToApply.AddRange(listBox.SelectedItems.Cast<TagItemViewModel>());
             }
             else 
                 tagsToApply.Add(targetTag);
 
             foreach (var tag in tagsToApply)
             {
-                if (dropInfo.Data is DraggedObjectsPackage<FileRecord>)
+                if (dropInfo.Data is DraggedObjectsPackage<FileItemViewModel>)
                 {
                     WeakReferenceMessenger.Default.Send(new ExecuteTagDrop(tag.Id));
                 }

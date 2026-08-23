@@ -5,6 +5,7 @@ using GongSolutions.Wpf.DragDrop;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.Windows;
+using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services;
@@ -20,6 +21,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IDialogService _dialogService;
         private readonly IFileService _fileService;
+        private readonly IFileTagService _fileTagService;
 
         public IDragSource DragHandler { get; }
         public IDropTarget DropHandler { get; }
@@ -29,30 +31,37 @@ namespace Tagger.viewmodel.FileViewerViewModel
         private CancellationTokenSource? _searchCts;
         private bool _isLoading;
         private List<FileRecord> _cachedFiles = [];
-        private List<Tag> _selectedTags = [];
+        private List<TagItemViewModel> _selectedTags = [];
+        private Dictionary<int, TagItemViewModel> globalUiTags;
 
         [ObservableProperty]
-        private ObservableCollection<FileRecord> _files;
+        private ObservableCollection<FileItemViewModel> _files;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsSearching))]
         [NotifyCanExecuteChangedFor(nameof(TriggerSearchWithDebounceCommand))]
         private string _currentSearchText;
 
-        public ObservableCollection<FileRecord> SelectedFiles { get; set; } = [];
+        public ObservableCollection<FileItemViewModel> SelectedFiles { get; set; } = [];
 
         public bool IsSearching => !string.IsNullOrWhiteSpace(CurrentSearchText) || _selectedTags.Count > 0;
 
-        public FileViewerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory, IDialogService dialogService, IFileService fileService)
+        public FileViewerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory,
+                                   IDialogService dialogService,
+                                   IFileService fileService,
+                                   IFileTagService fileTagService)
         {
             _contextFactory = contextFactory;
             _dialogService = dialogService;
             _fileService = fileService;
+            _fileTagService = fileTagService;
 
             DragHandler = new FileDragHandler(dialogService);
             DropHandler = new FileDropHandler();
 
             _currentActivePath = Properties.Settings.Default.FolderPath;
+
+            InitializeGlobalUiTags();
 
             SelectedFiles.CollectionChanged += (s, e) =>
             {
@@ -136,31 +145,49 @@ namespace Tagger.viewmodel.FileViewerViewModel
         /// <returns></returns>
         private async Task OnApplyTag(ApplyTagMessage message)
         {
-            var savedTag = await _fileService.ApplyFilesToTagsAsync(message.tagId, message.fileIds);
+            var savedTag = await _fileService.GetTagByIdAsync(message.tagId);
             if (savedTag == null) return;
+
+            InitializeGlobalUiTags();
+
+            if (!globalUiTags.TryGetValue(message.tagId, out var uiTag)) return;
 
             var fileIdsSet = message.fileIds.ToHashSet();
 
-            List<FileRecord> uiFiles = _cachedFiles
+            List<FileRecord> cachedFilesToUpdate = _cachedFiles
                 .Where(f => fileIdsSet.Contains(f.Id))
                 .ToList();
 
-            foreach (var uiFile in uiFiles)
+            foreach (var cachedFile in cachedFilesToUpdate)
             {
-                if (!uiFile.Tags.Any(t => t.Id == message.tagId))
-                    uiFile.Tags.Add(savedTag);
+                if (!cachedFile.Tags.Any(t => t.Id == savedTag.Id))
+                {
+                    cachedFile.Tags.Add(savedTag);
+                }
             }
 
-            await TriggerSearchWithDebounceAsync();
+            var uiFilesToUpdate = Files
+                .Where(f => fileIdsSet.Contains(f.Id))
+                .ToList();
+
+            foreach (var uiFile in uiFilesToUpdate)
+            {
+                if (!uiFile.Tags.Any(t => t.Id == message.tagId))
+                    uiFile.Tags.Add(uiTag);
+            }
         }
 
         private async Task OnRemoveTag(RemoveTagMessage message)
         {
             foreach (var file in _cachedFiles)
+            {
                 file.Tags.RemoveAll(t => t.Id == message.tagId);
+            }
 
             _selectedTags.RemoveAll(t => t.Id == message.tagId);
             OnPropertyChanged(nameof(IsSearching));
+
+            globalUiTags.Remove(message.tagId);
 
             await TriggerSearchWithDebounceAsync();
         }
@@ -168,6 +195,15 @@ namespace Tagger.viewmodel.FileViewerViewModel
         partial void OnCurrentSearchTextChanged(string value)
         {
             _ = TriggerSearchWithDebounceAsync();
+        }
+
+        private void InitializeGlobalUiTags()
+        {
+            var requestMessage = new RequestUiTagsDictionaryMessage();
+            WeakReferenceMessenger.Default.Send(requestMessage);
+            globalUiTags = requestMessage.HasReceivedResponse
+                ? requestMessage.Response
+                : [];
         }
 
         private async Task LoadFilesAsync(string path, CancellationToken token)
@@ -186,13 +222,15 @@ namespace Tagger.viewmodel.FileViewerViewModel
             {
                 var initialFiles = await _fileService.LoadFirstBatchFilesAsync(path, token);
 
+                var viewModelFiles = initialFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
+
                 if (Files == null)
-                    Files = new ObservableCollection<FileRecord>(initialFiles);
+                    Files = new ObservableCollection<FileItemViewModel>(viewModelFiles);
                 else
                 {
                     Files.Clear();
 
-                    foreach (var file in initialFiles)
+                    foreach (var file in viewModelFiles)
                         Files.Add(file);
                 }
 
@@ -254,14 +292,15 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 List<int> tagIds = [.. _selectedTags.Select(t => t.Id)];
 
                 var resultFiles = await _fileService.SearchWithDebounceAsync(CurrentSearchText, _cachedFiles, _currentActivePath, tagIds, _searchCts);
+                var viewModelResultFiles = resultFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
 
                 if (Files == null)
-                    Files = new ObservableCollection<FileRecord>(resultFiles);
+                    Files = new ObservableCollection<FileItemViewModel>(viewModelResultFiles);
                 else
                 {
                     Files.Clear();
 
-                    foreach (var file in resultFiles)
+                    foreach (var file in viewModelResultFiles)
                         Files.Add(file);
                 }
 
@@ -279,17 +318,18 @@ namespace Tagger.viewmodel.FileViewerViewModel
         /// <param name="fileId"></param>
         /// <param name="tagIds"></param>
         /// <returns></returns>
-        private async Task ApplyTagsToFilesAsync(int fileId, DraggedObjectsPackage<Tag> tags)
+        private async Task ApplyTagsToFilesAsync(int fileId, DraggedObjectsPackage<TagItemViewModel> UiTags)
         {
             try
             {
-                var tagIds = tags.Objects.Select(t => t.Id).ToList();
+                var tagIds = UiTags.Objects.Select(t => t.Id).ToList();
 
-                await _fileService.ApplyTagsToFilesAsync(fileId, tagIds);
+                var addedTagIds = await _fileTagService.LinkTagsToFileAsync(fileId, tagIds);
+                var tags = await _fileService.GetTagsByIds(tagIds);
 
-                await UpdateUiFiles(fileId, tags.Objects);
+                await UpdateUiFiles(fileId, UiTags.Objects, tags);
 
-                WeakReferenceMessenger.Default.Send(new ApplyFileMessage(fileId, tagIds));
+                WeakReferenceMessenger.Default.Send(new ApplyFileMessage(fileId, addedTagIds));
             }
             catch (Exception ex)
             {
@@ -297,19 +337,26 @@ namespace Tagger.viewmodel.FileViewerViewModel
             }
         }
 
-        private async Task UpdateUiFiles(int fileId, List<Tag> tagsToAdd)
+        private async Task UpdateUiFiles(int fileId, List<TagItemViewModel> UiTagsToAdd, List<Tag> dbTagsToAdd)
         {
             var fileInUi = Files.FirstOrDefault(f => f.Id == fileId);
             if (fileInUi != null)
             {
-                foreach (var tag in tagsToAdd)
+                foreach (var tag in UiTagsToAdd)
                 {
                     if (!fileInUi.Tags.Any(f => f.Id == tag.Id))
                         fileInUi.Tags.Add(tag);
                 }
             }
 
-            await TriggerSearchWithDebounceAsync();
+            var cachedFileToUpdate = _cachedFiles.FirstOrDefault(f => f.Id == fileId);
+            if (cachedFileToUpdate == null) return;
+
+            foreach (var dbTag in dbTagsToAdd)
+            {
+                if (!cachedFileToUpdate.Tags.Any(t => t.Id == dbTag.Id))
+                    cachedFileToUpdate.Tags.Add(dbTag);
+            }
         }
 
         public async void Receive(FolderChangedMessage message)
@@ -338,6 +385,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
         public void Receive(FilesScannedBatchMessage message)
         {
             var newFiles = message.FilesBatch;
+            var viewModelNewFiles = newFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
 
             if (newFiles.Count == 0)
             {
@@ -354,7 +402,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
             }
             else
             {
-                foreach (var file in newFiles)
+                foreach (var file in viewModelNewFiles)
                     if (Files?.Count < 3000) Files.Add(file);
             }
         }
