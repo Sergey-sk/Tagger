@@ -96,7 +96,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 await OnRemoveTag(message));
 
             WeakReferenceMessenger.Default.Register<ExecuteFileDrop>(this, async (r, message) =>
-                await ApplyTagsToFilesAsync(message.fileId, message.tags));
+                await ApplyTagsToFilesAsync(message.fileIds, message.uiTags));
         }
 
         private async Task OnScanStateChanged(ScanStateChangedMessage message)
@@ -318,18 +318,17 @@ namespace Tagger.viewmodel.FileViewerViewModel
         /// <param name="fileId"></param>
         /// <param name="tagIds"></param>
         /// <returns></returns>
-        private async Task ApplyTagsToFilesAsync(int fileId, DraggedObjectsPackage<TagItemViewModel> UiTags)
+        private async Task ApplyTagsToFilesAsync(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags)
         {
             try
             {
-                var tagIds = UiTags.Objects.Select(t => t.Id).ToList();
-
-                var addedTagIds = await _fileTagService.LinkTagsToFileAsync(fileId, tagIds);
+                var tagIds = uiTags.Objects.Select(t => t.Id).ToList();
+                var (addedTagIds, addedFileIds) = await _fileTagService.LinkTagsToFileAsync(fileIds, tagIds);
                 var tags = await _fileService.GetTagsByIds(tagIds);
 
-                await UpdateUiFiles(fileId, UiTags.Objects, tags);
+                await UpdateUiFiles(fileIds, uiTags.Objects, tags);
 
-                WeakReferenceMessenger.Default.Send(new ApplyFileMessage(fileId, addedTagIds));
+                WeakReferenceMessenger.Default.Send(new ApplyFileMessage(addedTagIds, addedFileIds));
             }
             catch (Exception ex)
             {
@@ -337,25 +336,32 @@ namespace Tagger.viewmodel.FileViewerViewModel
             }
         }
 
-        private async Task UpdateUiFiles(int fileId, List<TagItemViewModel> UiTagsToAdd, List<Tag> dbTagsToAdd)
+        private async Task UpdateUiFiles(List<int> fileIds, List<TagItemViewModel> uiTagsToAdd, List<Tag> dbTagsToAdd)
         {
-            var fileInUi = Files.FirstOrDefault(f => f.Id == fileId);
-            if (fileInUi != null)
+            var uiFiles = Files.Where(f => fileIds.Contains(f.Id)).ToList();
+
+            foreach(var uiFile in uiFiles)
             {
-                foreach (var tag in UiTagsToAdd)
+                if(uiFile != null)
                 {
-                    if (!fileInUi.Tags.Any(f => f.Id == tag.Id))
-                        fileInUi.Tags.Add(tag);
+                    foreach(var uiTag in uiTagsToAdd)
+                    {
+                        if(!uiFile.Tags.Any(t => t.Id == uiTag.Id))
+                            uiFile.Tags.Add(uiTag);
+                    }
                 }
             }
 
-            var cachedFileToUpdate = _cachedFiles.FirstOrDefault(f => f.Id == fileId);
-            if (cachedFileToUpdate == null) return;
+            var cachedFilesToUpdate = _cachedFiles.Where(f => fileIds.Contains(f.Id)).ToList();
+            if (cachedFilesToUpdate == null) return;
 
-            foreach (var dbTag in dbTagsToAdd)
+            foreach (var cachedFile in cachedFilesToUpdate)
             {
-                if (!cachedFileToUpdate.Tags.Any(t => t.Id == dbTag.Id))
-                    cachedFileToUpdate.Tags.Add(dbTag);
+                foreach (var dbTag in dbTagsToAdd)
+                {
+                    if (!cachedFile.Tags.Any(t => t.Id == dbTag.Id))
+                        cachedFile.Tags.Add(dbTag);
+                }
             }
         }
 

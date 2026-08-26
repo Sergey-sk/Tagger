@@ -69,10 +69,8 @@ namespace Tagger.services
             if (filesToApply.Count == 0)
                 filesToApply.Add(targetFile);
 
-            foreach (var file in filesToApply)
-            {
-                WeakReferenceMessenger.Default.Send(new ExecuteFileDrop(file.Id, tags));
-            }
+            var fileIds = filesToApply.Select(f => f.Id).ToList();  
+            WeakReferenceMessenger.Default.Send(new ExecuteFileDrop(fileIds, tags));
         }
     }
 }

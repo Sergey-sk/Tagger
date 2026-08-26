@@ -25,7 +25,7 @@ namespace Tagger.viewmodel
             FilesCount = model.Files.Count;
         }
 
-        public void IncrementFilesCount() => FilesCount++;
+        public void IncrementFilesCount(int num = 1) => FilesCount += num;
         public void DecrementFilesCount() => FilesCount--;
     }
 }

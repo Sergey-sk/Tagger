@@ -107,25 +107,18 @@ namespace Tagger.viewmodel.TagManagerViewModel
         /// <returns></returns>
         private async Task OnApplyFile(ApplyFileMessage message)
         {
+            if (message.tagIds == null || message.tagIds.Count == 0) return;
+
             var addedTagIdsSet = message.tagIds.ToHashSet();
 
-            var tagIdsSet = message.tagIds.ToHashSet();
-
-            List<TagItemViewModel> uiTags = Tags
-                .Where(t => tagIdsSet.Contains(t.Id))
-                .ToList();
-
-            foreach (var uiTag in uiTags)
+            using (TagsView?.DeferRefresh())
             {
-                if (addedTagIdsSet.Contains(uiTag.Id))
-                    uiTag.IncrementFilesCount();
+                foreach(var uiTag in Tags)
+                {
+                    if (addedTagIdsSet.Contains(uiTag.Id))
+                        uiTag.IncrementFilesCount(message.fileIds.Count);
+                }
             }
-
-            var sorted = Tags.OrderByDescending(t => t.FilesCount).ToList();
-            Tags.Clear();
-            foreach (var tag in sorted)
-                Tags.Add(tag);
-
             TagsView?.Refresh();
         }
 
@@ -174,6 +167,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
                 TagsView = CollectionViewSource.GetDefaultView(Tags);
                 TagsView.Filter = FilterTags;
+
+                TagsView.SortDescriptions.Clear();
+                TagsView.SortDescriptions.Add(new SortDescription(nameof(TagItemViewModel.FilesCount), ListSortDirection.Descending));
             }
             catch (Exception ex)
             {
@@ -268,19 +264,19 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
         private void UpdateUiTags(int tagId, int filesCount)
         {
-            var tagInUi = Tags.FirstOrDefault(t => t.Id == tagId);
-            if (tagInUi != null)
+            if (filesCount <= 0) return;
+
+            using (TagsView?.DeferRefresh())
             {
-                for (int i = 0; i < filesCount; i++)
+                var tagInUi = Tags.FirstOrDefault(t => t.Id == tagId);
+                if(tagInUi != null)
                 {
-                    tagInUi.IncrementFilesCount();
+                    for (int i = 0; i < filesCount; i++)
+                    {
+                        tagInUi.IncrementFilesCount();
+                    }
                 }
             }
-
-            var sorted = Tags.OrderByDescending(t => t.FilesCount).ToList();
-            Tags.Clear();
-            foreach (var tag in sorted)
-                Tags.Add(tag);
 
             TagsView?.Refresh();
         }

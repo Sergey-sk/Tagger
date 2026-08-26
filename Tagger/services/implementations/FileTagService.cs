@@ -70,55 +70,66 @@ namespace Tagger.services.implementations
         /// <summary>
         /// Вызывается при перетаскивании тега на файл
         /// </summary>
-        /// <param name="fileId"></param>
+        /// <param name="fileIds"></param>
         /// <param name="tagIds"></param>
         /// <returns></returns>
-        public async Task<List<int>> LinkTagsToFileAsync(int fileId, List<int> tagIds)
+        public async Task<(List<int> addedTagIds, List<int> addedFileIds)> LinkTagsToFileAsync(List<int> fileIds, List<int> tagIds)
         {
+            if (fileIds == null || fileIds.Count == 0 || tagIds == null || tagIds.Count == 0) return ([], []);
+
             using var context = await _contextFactory.CreateDbContextAsync();
 
-            var fileExist = await context.Files
-                .AnyAsync(f => f.Id == fileId);
+            var addedElementIds = new HashSet<(int, int)>();
+            var newFileTags = new List<FileTag>();
 
-            if (!fileExist) return [];
+            const int SearchBatchSize = 500;
 
-            var uniqueIncomingIds = tagIds.Distinct().ToList();
-
-            var attachedTagIds = await context.FileTags
-                .Where(ft => ft.FileId == fileId && uniqueIncomingIds.Contains(ft.TagId))
-                .Select(ft => ft.TagId)
-                .ToListAsync();
-
-            var existingIdsSet = attachedTagIds.ToHashSet();
-
-            var newTagIds = uniqueIncomingIds
-                .Where(id => !existingIdsSet.Contains(id))
-                .ToList();
-
-            if (newTagIds.Count == 0) return [];
-
-            const int BatchSize = 5000;
-
-            for (int i = 0; i < newTagIds.Count; i += BatchSize)
+            foreach (int[] currentBatch in fileIds.Chunk(SearchBatchSize))
             {
-                var currentBatch = newTagIds.Skip(i).Take(BatchSize);
-                var entriesToAdd = new List<FileTag>();
+                var existingSet = await context.FileTags
+                    .AsNoTracking()
+                    .Where(ft => currentBatch.Contains(ft.FileId) && tagIds.Contains(ft.TagId))
+                    .Select(ft => ValueTuple.Create(ft.FileId, ft.TagId))
+                    .ToHashSetAsync();
 
-                foreach (var tagId in currentBatch)
+                foreach (var fileId in currentBatch)
                 {
-                    var link = new FileTag()
+                    foreach (var tagId in tagIds)
                     {
-                        TagId = tagId,
-                        FileId = fileId,
-                    };
-                    entriesToAdd.Add(link);
-                }
+                        if (!existingSet.Contains((fileId, tagId)))
+                        {
+                            newFileTags.Add(new FileTag { FileId = fileId, TagId = tagId });
+                            addedElementIds.Add((tagId, fileId));
+                        }
 
-                await context.FileTags.AddRangeAsync(entriesToAdd);
-                await context.SaveChangesAsync();
+                        if (newFileTags.Count >= 2000)
+                        {
+                            context.FileTags.AddRange(newFileTags);
+                            await context.SaveChangesAsync();
+                            context.ChangeTracker.Clear();
+                            newFileTags.Clear();
+                        }
+                    }
+                }
             }
 
-            return newTagIds;
+            if (newFileTags.Count > 0)
+            {
+                context.FileTags.AddRange(newFileTags);
+                await context.SaveChangesAsync();
+                context.ChangeTracker.Clear();
+            }
+
+            var uniqueAddedTags = new HashSet<int>();
+            var uniqueAddedFiles = new HashSet<int>();
+
+            foreach (var addedElementId in addedElementIds)
+            {
+                uniqueAddedTags.Add(addedElementId.Item1);
+                uniqueAddedFiles.Add(addedElementId.Item2);
+            }
+
+            return (uniqueAddedTags.ToList(), uniqueAddedFiles.ToList());
         }
     }
 }

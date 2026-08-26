@@ -26,11 +26,11 @@ namespace Tagger.messages
     public record ChangeProgressStatus(bool isLoading, string value);
 
     public record ApplyTagMessage(int tagId, List<int> fileIds);
-    public record ApplyFileMessage(int fileId, List<int> tagIds);
+    public record ApplyFileMessage(List<int> tagIds, List<int> fileIds);
     public record RemoveTagMessage(int tagId);
 
     public record ExecuteTagDrop(int tagId);
-    public record ExecuteFileDrop(int fileId, DraggedObjectsPackage<TagItemViewModel> tags);
+    public record ExecuteFileDrop(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags);
     public record ExecuteExternalTagDrop(int tagId, string[] paths);
 
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
