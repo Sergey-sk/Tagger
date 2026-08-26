@@ -91,11 +91,5 @@ namespace Tagger.services.implementations
                 .Where(t => setIds.Contains(t.Id))
                 .ToListAsync();
         }
-
-        public async Task<Tag?> GetTagByIdAsync(int tagId)
-        {
-            var tags = await GetTagsByIds([tagId]);
-            return tags.FirstOrDefault();
-        }
     }
 }

@@ -1,11 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.Messaging.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Tagger.dto;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.viewmodel;
+using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.messages
 {
@@ -25,13 +23,13 @@ namespace Tagger.messages
 
     public record ChangeProgressStatus(bool isLoading, string value);
 
-    public record ApplyTagMessage(int tagId, List<int> fileIds);
+    public record ApplyTagMessage(List<int> tagIds, List<int> fileIds);
     public record ApplyFileMessage(List<int> tagIds, List<int> fileIds);
     public record RemoveTagMessage(int tagId);
 
-    public record ExecuteTagDrop(int tagId);
+    public record ExecuteTagDrop(TagAssignmentPayload assignmentPayload);
     public record ExecuteFileDrop(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags);
-    public record ExecuteExternalTagDrop(int tagId, string[] paths);
+    public record ExecuteExternalTagDrop(List<int> tagIds, string[] paths);
 
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
 

@@ -60,22 +60,19 @@ namespace Tagger.services
             else 
                 tagsToApply.Add(targetTag);
 
-            foreach (var tag in tagsToApply)
+            var tagIds = tagsToApply.Select(t => t.Id).ToList();
+
+            if (dropInfo.Data is DraggedObjectsPackage<FileItemViewModel> draggedFiles)
+                WeakReferenceMessenger.Default.Send(new ExecuteTagDrop(new TagAssignmentPayload(tagIds, draggedFiles.Objects)));
+
+            if (dropInfo.Data is DataObject data && data.ContainsFileDropList())
             {
-                if (dropInfo.Data is DraggedObjectsPackage<FileItemViewModel>)
-                {
-                    WeakReferenceMessenger.Default.Send(new ExecuteTagDrop(tag.Id));
-                }
-
-                if (dropInfo.Data is DataObject data && data.ContainsFileDropList())
-                {
-                    var paths = data.GetFileDropList().Cast<string>().ToArray();
-                    WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tag.Id, paths));
-                }
-
-                if (dropInfo.Data is string[] filePaths)
-                    WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tag.Id, filePaths));
+                var paths = data.GetFileDropList().Cast<string>().ToArray();
+                WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tagIds, paths));
             }
+
+            if (dropInfo.Data is string[] filePaths)
+                WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tagIds, filePaths));
         }
     }
 }

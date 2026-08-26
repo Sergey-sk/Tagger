@@ -26,7 +26,7 @@ namespace Tagger.viewmodel
                              IFileService fileService,
                              IFileTagService fileTagService)
         {
-            FileViewer = new FileViewerViewModel.FileViewerViewModel(contextFactory, dialogService, fileService, fileTagService);
+            FileViewer = new FileViewerViewModel.FileViewerViewModel(dialogService, fileService, fileTagService);
             Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService);
             Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService);
             TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService, fileTagService);

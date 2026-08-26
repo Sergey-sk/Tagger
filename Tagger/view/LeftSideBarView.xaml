@@ -346,7 +346,7 @@
                                     <ContextMenu>
                                         <MenuItem Header="Применить к выделенным файлам"
                                                   Command="{Binding PlacementTarget.Tag.ApplyTagToFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                  CommandParameter="{Binding Path=Id}"/>
+                                                  CommandParameter="{Binding Path=AssignmentPayload}"/>
                                         <MenuItem Header="Удалить"
                                                   Command="{Binding PlacementTarget.Tag.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding Path=Id}"/>

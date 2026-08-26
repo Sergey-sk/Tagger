@@ -17,7 +17,7 @@ namespace Tagger.dto
         public DateTime LastModified => Model.LastModified;
         public ObservableCollection<TagItemViewModel> Tags { get; } = new();
 
-        public FileItemViewModel(FileRecord model, Dictionary<int, TagItemViewModel> allUiTags)
+        public FileItemViewModel(FileRecord model, Dictionary<int, TagItemViewModel> allUiTags, Func<List<FileItemViewModel>> getSelectedFiles)
         {
             Model = model;
 
@@ -27,7 +27,7 @@ namespace Tagger.dto
                     Tags.Add(existingUiTag);
                 else
                 {
-                    var newUiTag = new TagItemViewModel(tag);
+                    var newUiTag = new TagItemViewModel(tag, getSelectedFiles);
                     allUiTags[tag.Id] = newUiTag;
                     Tags.Add(newUiTag);
                 }

@@ -80,10 +80,10 @@ namespace Tagger.viewmodel.TagManagerViewModel
             });
 
             WeakReferenceMessenger.Default.Register<ExecuteTagDrop>(this, async (r, message) =>
-                await ApplyTagToFilesAsync(message.tagId));
+                await ApplyTagToFilesAsync(message.assignmentPayload));
 
             WeakReferenceMessenger.Default.Register<ExecuteExternalTagDrop>(this, async (r, message) =>
-                await HandleExternalDropAsync(message.tagId, message.paths));
+                await HandleExternalDropAsync(message.tagIds, message.paths));
 
             WeakReferenceMessenger.Default.Register<ApplyFileMessage>(this, async (r, message) =>
                 await OnApplyFile(message));
@@ -113,7 +113,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
             using (TagsView?.DeferRefresh())
             {
-                foreach(var uiTag in Tags)
+                foreach (var uiTag in Tags)
                 {
                     if (addedTagIdsSet.Contains(uiTag.Id))
                         uiTag.IncrementFilesCount(message.fileIds.Count);
@@ -162,7 +162,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
             {
                 SelectedTags.Clear();
                 var tags = await _tagService.LoadTagsAsync();
-                var viewModelTags = tags.Select(t => new TagItemViewModel(t));
+                var viewModelTags = tags.Select(t => new TagItemViewModel(t, () => _selectedFiles.ToList()));
                 Tags = new ObservableCollection<TagItemViewModel>(viewModelTags);
 
                 TagsView = CollectionViewSource.GetDefaultView(Tags);
@@ -183,7 +183,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
             try
             {
                 var newTag = await _tagService.CreateTagAsync(SearchText.Trim());
-                var viewModelTag = new TagItemViewModel(newTag);
+                var viewModelTag = new TagItemViewModel(newTag, () => _selectedFiles.ToList());
 
                 Tags.Add(viewModelTag);
 
@@ -244,17 +244,17 @@ namespace Tagger.viewmodel.TagManagerViewModel
         /// <returns></returns>
 
         [RelayCommand(CanExecute = nameof(CanApplyFilesToTag))]
-        private async Task ApplyTagToFilesAsync(int tagId)
+        private async Task ApplyTagToFilesAsync(TagAssignmentPayload assignmentPayload)
         {
             try
             {
-                var selectedFileIds = _selectedFiles.Select(f => f.Id).ToList();
+                var selectedFileIds = assignmentPayload.Files.Select(f => f.Id).ToList();
 
-                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagId, selectedFileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync(assignmentPayload.TagIds, selectedFileIds);
 
-                UpdateUiTags(tagId, newFileIds.Count);
+                UpdateUiTags(assignmentPayload.TagIds, newFileIds.Count);
 
-                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, selectedFileIds));
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(assignmentPayload.TagIds, selectedFileIds));
             }
             catch (Exception ex)
             {
@@ -262,20 +262,17 @@ namespace Tagger.viewmodel.TagManagerViewModel
             }
         }
 
-        private void UpdateUiTags(int tagId, int filesCount)
+        private void UpdateUiTags(List<int> tagIds, int filesCount)
         {
             if (filesCount <= 0) return;
 
             using (TagsView?.DeferRefresh())
             {
-                var tagInUi = Tags.FirstOrDefault(t => t.Id == tagId);
-                if(tagInUi != null)
-                {
-                    for (int i = 0; i < filesCount; i++)
-                    {
-                        tagInUi.IncrementFilesCount();
-                    }
-                }
+                var tagsInUi = Tags.Where(t => tagIds.Contains(t.Id)).ToList();
+                if (tagsInUi == null || tagsInUi.Count == 0) return;
+
+                foreach (var uiTag in tagsInUi)
+                    uiTag.IncrementFilesCount(filesCount);
             }
 
             TagsView?.Refresh();
@@ -283,7 +280,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
         private bool CanApplyFilesToTag() => _selectedFiles.Count > 0;
 
-        private async Task HandleExternalDropAsync(int tagId, string[] filePaths)
+        private async Task HandleExternalDropAsync(List<int> tagIds, string[] filePaths)
         {
             try
             {
@@ -297,13 +294,13 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
                 var fileIds = await _fileIndexingService.AddFilesFromPathAsync(filePaths.ToList(), progress);
 
-                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagId, fileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagIds, fileIds);
 
-                UpdateUiTags(tagId, newFileIds.Count);
+                UpdateUiTags(tagIds, newFileIds.Count);
 
                 isOperationActive = false;
 
-                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagId, fileIds));
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagIds, fileIds));
                 WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Готово"));
             }
             catch (Exception ex)

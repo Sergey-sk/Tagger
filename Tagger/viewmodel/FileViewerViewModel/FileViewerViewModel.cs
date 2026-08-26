@@ -18,7 +18,6 @@ namespace Tagger.viewmodel.FileViewerViewModel
         IRecipient<FolderChangedMessage>,
         IRecipient<FilesScannedBatchMessage>
     {
-        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IDialogService _dialogService;
         private readonly IFileService _fileService;
         private readonly IFileTagService _fileTagService;
@@ -46,12 +45,10 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
         public bool IsSearching => !string.IsNullOrWhiteSpace(CurrentSearchText) || _selectedTags.Count > 0;
 
-        public FileViewerViewModel(IDbContextFactory<ApplicationDbContext> contextFactory,
-                                   IDialogService dialogService,
+        public FileViewerViewModel(IDialogService dialogService,
                                    IFileService fileService,
                                    IFileTagService fileTagService)
         {
-            _contextFactory = contextFactory;
             _dialogService = dialogService;
             _fileService = fileService;
             _fileTagService = fileTagService;
@@ -145,35 +142,38 @@ namespace Tagger.viewmodel.FileViewerViewModel
         /// <returns></returns>
         private async Task OnApplyTag(ApplyTagMessage message)
         {
-            var savedTag = await _fileService.GetTagByIdAsync(message.tagId);
-            if (savedTag == null) return;
+            var savedTags = await _fileService.GetTagsByIds(message.tagIds);
+            if (savedTags == null || savedTags.Count == 0) return;
 
             InitializeGlobalUiTags();
 
-            if (!globalUiTags.TryGetValue(message.tagId, out var uiTag)) return;
-
-            var fileIdsSet = message.fileIds.ToHashSet();
-
-            List<FileRecord> cachedFilesToUpdate = _cachedFiles
-                .Where(f => fileIdsSet.Contains(f.Id))
-                .ToList();
-
-            foreach (var cachedFile in cachedFilesToUpdate)
+            foreach (var tag in savedTags)
             {
-                if (!cachedFile.Tags.Any(t => t.Id == savedTag.Id))
+                if (!globalUiTags.TryGetValue(tag.Id, out var uiTag)) return;
+
+                var fileIdsSet = message.fileIds.ToHashSet();
+
+                List<FileRecord> cachedFilesToUpdate = _cachedFiles
+                    .Where(f => fileIdsSet.Contains(f.Id))
+                    .ToList();
+
+                foreach (var cachedFile in cachedFilesToUpdate)
                 {
-                    cachedFile.Tags.Add(savedTag);
+                    if (!cachedFile.Tags.Any(t => t.Id == tag.Id))
+                    {
+                        cachedFile.Tags.Add(tag);
+                    }
                 }
-            }
 
-            var uiFilesToUpdate = Files
-                .Where(f => fileIdsSet.Contains(f.Id))
-                .ToList();
+                var uiFilesToUpdate = Files
+                    .Where(f => fileIdsSet.Contains(f.Id))
+                    .ToList();
 
-            foreach (var uiFile in uiFilesToUpdate)
-            {
-                if (!uiFile.Tags.Any(t => t.Id == message.tagId))
-                    uiFile.Tags.Add(uiTag);
+                foreach (var uiFile in uiFilesToUpdate)
+                {
+                    if (!uiFile.Tags.Any(t => t.Id == tag.Id))
+                        uiFile.Tags.Add(uiTag);
+                }
             }
         }
 
@@ -222,7 +222,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
             {
                 var initialFiles = await _fileService.LoadFirstBatchFilesAsync(path, token);
 
-                var viewModelFiles = initialFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
+                var viewModelFiles = initialFiles.Select(f => new FileItemViewModel(f, globalUiTags, () => SelectedFiles.ToList())).ToList();
 
                 if (Files == null)
                     Files = new ObservableCollection<FileItemViewModel>(viewModelFiles);
@@ -292,7 +292,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 List<int> tagIds = [.. _selectedTags.Select(t => t.Id)];
 
                 var resultFiles = await _fileService.SearchWithDebounceAsync(CurrentSearchText, _cachedFiles, _currentActivePath, tagIds, _searchCts);
-                var viewModelResultFiles = resultFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
+                var viewModelResultFiles = resultFiles.Select(f => new FileItemViewModel(f, globalUiTags, () => SelectedFiles.ToList())).ToList();
 
                 if (Files == null)
                     Files = new ObservableCollection<FileItemViewModel>(viewModelResultFiles);
@@ -391,7 +391,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
         public void Receive(FilesScannedBatchMessage message)
         {
             var newFiles = message.FilesBatch;
-            var viewModelNewFiles = newFiles.Select(f => new FileItemViewModel(f, globalUiTags)).ToList();
+            var viewModelNewFiles = newFiles.Select(f => new FileItemViewModel(f, globalUiTags, () => SelectedFiles.ToList())).ToList();
 
             if (newFiles.Count == 0)
             {
