@@ -33,6 +33,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
         [ObservableProperty]
         private ICollectionView? _tagsView;
 
+        [ObservableProperty]
+        private ObservableCollection<TagItemViewModel> _sharedTagsForSelection;
+
         public ObservableCollection<TagItemViewModel> SelectedTags { get; set; } = [];
 
         private List<FileItemViewModel> _selectedFiles = [];
@@ -73,11 +76,8 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 SearchText = string.Empty;
             });
 
-            WeakReferenceMessenger.Default.Register<SelectedItemsChangedMessage>(this, (r, message) =>
-            {
-                _selectedFiles = message.selectedItems;
-                ApplyTagToFilesCommand.NotifyCanExecuteChanged();
-            });
+            WeakReferenceMessenger.Default.Register<SelectedItemsChangedMessage>(this, async (r, message) =>
+                await OnSelectedFilesChangedMessage(message));
 
             WeakReferenceMessenger.Default.Register<ExecuteTagDrop>(this, async (r, message) =>
                 await ApplyTagToFilesAsync(message.assignmentPayload));
@@ -98,6 +98,22 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
             WeakReferenceMessenger.Default.Register<RequestUiTagsDictionaryMessage>(this, (r, message) =>
                 OnRequestUiTagsDictionary(message));
+
+            WeakReferenceMessenger.Default.Register<DetachTagMessage>(this, (r, message) =>
+            {
+                using (TagsView?.DeferRefresh())
+                {
+                    var tag = Tags.FirstOrDefault(t => t.Id == message.tagId);
+
+                    if (tag != null)
+                    {
+                        tag.DecrementFilesCount(message.detachedFilesCount);
+                        SharedTagsForSelection.Remove(tag);
+                    }
+                }
+
+                TagsView?.Refresh();
+            });
         }
 
         /// <summary>
@@ -120,6 +136,33 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 }
             }
             TagsView?.Refresh();
+        }
+
+        private async Task OnSelectedFilesChangedMessage(SelectedItemsChangedMessage message)
+        {
+            _selectedFiles = message.selectedItems;
+            ApplyTagToFilesCommand.NotifyCanExecuteChanged();
+
+            foreach (var tag in Tags)
+            {
+                tag.RefreshSelectionState();
+            }
+
+            if (_selectedFiles == null || _selectedFiles.Count == 0)
+            {
+                SharedTagsForSelection?.Clear();
+                return;
+            }
+
+            var tagsForSelection = Tags.Where(t => t.IsAttachedToAllSelectedFiles || t.IsAttachedToAnySelectedFiles).ToList();
+            if (SharedTagsForSelection == null)
+                SharedTagsForSelection = new ObservableCollection<TagItemViewModel>(tagsForSelection);
+            else
+            {
+                SharedTagsForSelection.Clear();
+                foreach (var tag in tagsForSelection)
+                    SharedTagsForSelection.Add(tag);
+            }
         }
 
         private void OnRequestUiTagsDictionary(RequestUiTagsDictionaryMessage message)
@@ -272,7 +315,14 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 if (tagsInUi == null || tagsInUi.Count == 0) return;
 
                 foreach (var uiTag in tagsInUi)
+                {
                     uiTag.IncrementFilesCount(filesCount);
+
+                    if (SharedTagsForSelection == null)
+                        SharedTagsForSelection = new ObservableCollection<TagItemViewModel>();
+
+                    SharedTagsForSelection.Add(uiTag);
+                }
             }
 
             TagsView?.Refresh();

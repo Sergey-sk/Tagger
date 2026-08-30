@@ -18,6 +18,8 @@
 
     <UserControl.Resources>
         <nmsp:SizeConverter x:Key="SizeConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+
         <Style x:Key="filtersTextBox" TargetType="TextBox">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -44,6 +46,64 @@
                 </StackPanel>
             </Border>
         </DataTemplate>
+
+        <ControlTemplate x:Key="OpenPanelButton" TargetType="Button">
+            <Border Background="Transparent" CornerRadius="4">
+                <ContentPresenter x:Name="content"
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Center"
+                                  Opacity="0.7"
+                                  RenderTransformOrigin="0.5,0.5">
+                    <ContentPresenter.RenderTransform>
+                        <TransformGroup>
+                            <TranslateTransform x:Name="contentTranslate" X="0"/>
+                            <RotateTransform x:Name="contentRotate"/>
+                        </TransformGroup>
+                    </ContentPresenter.RenderTransform>
+                </ContentPresenter>
+            </Border>
+
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard x:Name="HoverStoryboard">
+                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                <DoubleAnimation Storyboard.TargetName="contentTranslate"
+                                                 Storyboard.TargetProperty="X"
+                                                 To="-3" Duration="0:0:0.35">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CircleEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+
+                                <DoubleAnimation Storyboard.TargetName="content"
+                                                 Storyboard.TargetProperty="Opacity"
+                                                 To="1" Duration="0:0:0.2"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="contentTranslate"
+                                                 Storyboard.TargetProperty="X"
+                                                 To="0" Duration="0:0:0.15"/>
+
+                                <DoubleAnimation Storyboard.TargetName="content"
+                                                 Storyboard.TargetProperty="Opacity"
+                                                 To="0.7" Duration="0:0:0.15"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+                <DataTrigger Binding="{Binding FileViewer.IsPanelOpen}" Value="True">
+                    <Setter Property="Visibility" Value="Hidden"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding FileViewer.IsPanelOpen}" Value="False">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
     </UserControl.Resources>
 
     <Border Margin="10"
@@ -55,16 +115,25 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" Margin="0,5">
-                <TextBlock VerticalAlignment="Center" Padding="10,3">
+                <DockPanel Margin="0,5">
+                    <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Padding="10,3">
                     <Run Text="&#xE71C;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
                     <Run Text="Текущий фильтр: "/>
                 </TextBlock>
-                <TextBox Style="{StaticResource filtersTextBox}"
+                <TextBox DockPanel.Dock="Left"
+                         Style="{StaticResource filtersTextBox}"
                          Text="{Binding TagManager.CurrentFilterStr, Mode=OneWay}"
                          IsReadOnly="True"
                          TextWrapping="Wrap"/>
-            </StackPanel>
+
+                <Button DockPanel.Dock="Right"
+                        Content="&#xE8A0;"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        HorizontalAlignment="Right"
+                        Template="{StaticResource OpenPanelButton}"
+                        Command="{Binding FileViewer.CloseOpenPanelCommand}"/>
+            </DockPanel>
 
             <ListView x:Name="listView"
                       Grid.Row="1"
@@ -143,34 +212,48 @@
 
                 <ListView.View>
                     <GridView>
-                        <GridViewColumn DisplayMemberBinding="{Binding Name}" Width="Auto">Имя</GridViewColumn>
+                        <GridViewColumn Header="Имя" Width="Auto">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" ToolTip="{Binding Path}"/>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
                         <GridViewColumn DisplayMemberBinding="{Binding Size, Converter={StaticResource SizeConverter}}" Width="Auto">Размер</GridViewColumn>
                         <GridViewColumn DisplayMemberBinding="{Binding LastModified, StringFormat='{}{0:dd.MM.yyyy HH:mm}'}"
                                         Width="Auto">Дата изменения</GridViewColumn>
                         <GridViewColumn Header="Теги" Width="Auto">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <ItemsControl ItemsSource="{Binding Tags}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ItemsControl ItemsSource="{Binding TopTags}">
 
-                                        <ItemsControl.ItemContainerStyle>
-                                            <Style TargetType="ContentPresenter">
-                                                <Setter Property="Margin" Value="0,3"/>
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                            </Style>
-                                        </ItemsControl.ItemContainerStyle>
+                                            <ItemsControl.ItemContainerStyle>
+                                                <Style TargetType="ContentPresenter">
+                                                    <Setter Property="Margin" Value="0,3"/>
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                </Style>
+                                            </ItemsControl.ItemContainerStyle>
 
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
                                                         BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                                                         BorderThickness="1"
                                                         CornerRadius="4"
                                                         Padding="6,3">
-                                                    <TextBlock Text="{Binding Name}"/>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                                        <TextBlock Text="{Binding Name}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Text="{Binding RemainingTagsCount, StringFormat='+ {0}'}"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Visibility="{Binding HasMoreTags, Converter={StaticResource BoolToVisConverter}}"
+                                                   Margin="5,0,0,0"/>
+                                    </StackPanel>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>

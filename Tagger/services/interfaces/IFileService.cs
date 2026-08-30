@@ -17,5 +17,7 @@ namespace Tagger.services.interfaces
             List<int> tagIds,
             CancellationTokenSource? searchCts);
         Task<List<Tag>> GetTagsByIds(List<int> tagIds);
+
+        Task DetachTagFromFilesAsync(int tagId, List<int> selectedFileIds);
     }
 }

@@ -14,4 +14,8 @@
 
     <SolidColorBrush x:Key="BorderBackgroundSelectedBrush" Color="#14000000"/>
     <SolidColorBrush x:Key="BorderBorderBrushSelectedBrush" Color="#26000000"/>
+
+    <!--Right Tag Panel-->
+    <SolidColorBrush x:Key="RightTagPanelBackgroundBrush" Color="#B3F3F4F6"/>
+    <SolidColorBrush x:Key="RightTagPanelBorderBrush" Color="#26000000"/>
 </ResourceDictionary>

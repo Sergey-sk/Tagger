@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using GongSolutions.Wpf.DragDrop;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows;
 using Tagger.dto;
 using Tagger.messages;
@@ -41,7 +42,11 @@ namespace Tagger.viewmodel.FileViewerViewModel
         [NotifyCanExecuteChangedFor(nameof(TriggerSearchWithDebounceCommand))]
         private string _currentSearchText;
 
+        [ObservableProperty]
+        private bool _isPanelOpen = false;
+
         public ObservableCollection<FileItemViewModel> SelectedFiles { get; set; } = [];
+        public long SelectedFilesSize => SelectedFiles.Sum(f => f.Size);
 
         public bool IsSearching => !string.IsNullOrWhiteSpace(CurrentSearchText) || _selectedTags.Count > 0;
 
@@ -60,11 +65,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             InitializeGlobalUiTags();
 
-            SelectedFiles.CollectionChanged += (s, e) =>
-            {
-                var currentSelection = SelectedFiles.ToList();
-                WeakReferenceMessenger.Default.Send(new SelectedItemsChangedMessage(currentSelection));
-            };
+            SelectedFiles.CollectionChanged += OnSelectedFilesCollectionChanged;
 
             WeakReferenceMessenger.Default.Register<FolderChangedMessage>(this);
             WeakReferenceMessenger.Default.Register<FilesScannedBatchMessage>(this);
@@ -94,6 +95,19 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             WeakReferenceMessenger.Default.Register<ExecuteFileDrop>(this, async (r, message) =>
                 await ApplyTagsToFilesAsync(message.fileIds, message.uiTags));
+        }
+
+        private void OnSelectedFilesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            var currentSelection = SelectedFiles.ToList();
+            OnPropertyChanged(nameof(SelectedFilesSize));
+
+            int previousCount = SelectedFiles.Count - (e.NewItems?.Count ?? 0) + (e.OldItems?.Count ?? 0);
+
+            if (SelectedFiles.Count > 0 && previousCount == 0) IsPanelOpen = true;
+            else if (SelectedFiles.Count == 0) IsPanelOpen = false;
+
+            WeakReferenceMessenger.Default.Send(new SelectedItemsChangedMessage(currentSelection));
         }
 
         private async Task OnScanStateChanged(ScanStateChangedMessage message)
@@ -310,6 +324,42 @@ namespace Tagger.viewmodel.FileViewerViewModel
                 }
             }
             catch (OperationCanceledException) { }
+        }
+
+        [RelayCommand]
+        private void CloseOpenPanel() => IsPanelOpen = !IsPanelOpen;
+
+        [RelayCommand]
+        private async Task DetachTagFromFileAsync(int tagId)
+        {
+            int attachedFilesCount = SelectedFiles.Count(f => f.Tags.Any(t => t.Id == tagId));
+            var result = _dialogService.ShowMessage($"Открепить тег от всех выбранных файлов? ({attachedFilesCount} шт.)",
+                                                     "Открепление тега",
+                                                     MessageBoxButton.YesNo,
+                                                     MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.No) return;
+            await _fileService.DetachTagFromFilesAsync(tagId, SelectedFiles.Select(f => f.Id).ToList());
+
+            if (!globalUiTags.TryGetValue(tagId, out var uiTag)) return;
+
+            var fileIdsSet = SelectedFiles.Select(f => f.Id).ToHashSet();
+
+            List<FileRecord> cachedFilesToUpdate = _cachedFiles
+                .Where(f => fileIdsSet.Contains(f.Id))
+                .ToList();
+
+            foreach (var cachedFile in cachedFilesToUpdate)
+                cachedFile.Tags.RemoveAll(t => t.Id == tagId);
+
+            var uiFilesToUpdate = Files
+                .Where(f => fileIdsSet.Contains(f.Id))
+                .ToList();
+
+            foreach (var uiFile in uiFilesToUpdate)
+                uiFile.Tags.Remove(uiTag);
+
+            WeakReferenceMessenger.Default.Send(new DetachTagMessage(tagId, attachedFilesCount));
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿    <UserControl x:Class="Tagger.view.LeftSideBarView"
+﻿<UserControl x:Class="Tagger.view.LeftSideBarView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -19,6 +19,8 @@
     </i:Interaction.Triggers>
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+
         <Style TargetType="ListBoxItem" x:Key="BaseListBoxItem">
             <Setter Property="Padding" Value="10,3"/>
             <Setter Property="Margin" Value="4,2"/>
@@ -332,6 +334,7 @@
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Width" Value="Auto"/>
                             <Setter Property="MinHeight" Value="50"/>
+                            <Setter Property="MaxWidth" Value="100"/>
                             <Setter Property="Margin" Value="4"/>
                             <Setter Property="Padding" Value="6"/>
                             <Setter Property="BorderThickness" Value="1"/>
@@ -370,22 +373,65 @@
                                                 </Grid.ColumnDefinitions>
 
                                                 <TextBlock Grid.Column="0"
+                                                           x:Name="tagName"
                                                            Text="{Binding Name}"
                                                            VerticalAlignment="Center"
-                                                           HorizontalAlignment="Center"
+                                                           HorizontalAlignment="Left"
                                                            TextTrimming="CharacterEllipsis"
                                                            ToolTip="{Binding Name}"
-                                                           Margin="0,0,4,0"/>
+                                                           Margin="4,0,4,0"/>
+
                                                 <TextBlock Grid.Column="1"
+                                                           x:Name="tagFilesCount"
                                                            Text="{Binding FilesCount, StringFormat='({0})'}"
                                                            VerticalAlignment="Center"
                                                            HorizontalAlignment="Center"
                                                            FontWeight="SemiBold"
                                                            Opacity="0.75"/>
+
+                                                <!--<CheckBox Grid.Column="1"
+                                                          x:Name="tagCheckBox"
+                                                          Opacity="0"
+                                                          IsHitTestVisible="False"
+                                                          IsThreeState="True"
+                                                          IsChecked="{Binding IsAttachedToSelectedFiles, Mode=TwoWay}"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="Left"/>-->
                                             </Grid>
                                         </Border>
 
                                         <ControlTemplate.Triggers>
+                                            <!--<DataTrigger Binding="{Binding IsSelectionModeActive}" Value="True">
+                                                <Setter TargetName="tagCheckBox" Property="IsHitTestVisible" Value="True"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="tagFilesCount"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.2"/>
+                                                            
+                                                            <DoubleAnimation Storyboard.TargetName="tagCheckBox"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="1" Duration="0:0:0.2"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="tagFilesCount"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="0.75" Duration="0:0:0.2"/>
+                                                            
+                                                            <DoubleAnimation Storyboard.TargetName="tagCheckBox"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.2"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>-->
+
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="tagBorder" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
                                                 <Setter TargetName="tagBorder" Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}"/>

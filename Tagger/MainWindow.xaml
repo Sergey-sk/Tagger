@@ -52,7 +52,8 @@
     </Window.InputBindings>
 
     <Grid Background="Transparent"
-          Margin="{Binding Padding, RelativeSource={RelativeSource AncestorType=Window}}">
+          Margin="{Binding Padding, RelativeSource={RelativeSource AncestorType=Window}}"
+          ClipToBounds="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -82,6 +83,8 @@
                               VerticalAlignment="Stretch"/>
 
                 <view:MainWorkspaceView x:Name="Workspace" Grid.Column="2"/>
+
+                <view:SelectedFilesPanel Grid.Column="2" HorizontalAlignment="Right"/>
             </Grid>
         </Border>
 

@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Tagger.model;
 using Tagger.viewmodel;
 
@@ -16,10 +17,15 @@ namespace Tagger.dto
         public long Size => Model.Size;
         public DateTime LastModified => Model.LastModified;
         public ObservableCollection<TagItemViewModel> Tags { get; } = new();
+        public ObservableCollection<TagItemViewModel> TopTags { get; } = new();
+        public int RemainingTagsCount => Tags != null && Tags.Count > 3 ? Tags.Count - 3 : 0;
+        public bool HasMoreTags => RemainingTagsCount > 0;
 
         public FileItemViewModel(FileRecord model, Dictionary<int, TagItemViewModel> allUiTags, Func<List<FileItemViewModel>> getSelectedFiles)
         {
             Model = model;
+
+            Tags.CollectionChanged += OnTagsCollectionChanged;
 
             foreach (var tag in model.Tags)
             {
@@ -32,6 +38,16 @@ namespace Tagger.dto
                     Tags.Add(newUiTag);
                 }
             }
+        }
+
+        private void OnTagsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            TopTags.Clear();
+            foreach (var tag in Tags.Take(3))
+                TopTags.Add(tag);
+
+            OnPropertyChanged(nameof(RemainingTagsCount));
+            OnPropertyChanged(nameof(HasMoreTags));
         }
     }
 }

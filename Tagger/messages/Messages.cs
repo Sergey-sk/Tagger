@@ -33,6 +33,8 @@ namespace Tagger.messages
 
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
 
+    public record DetachTagMessage(int tagId, int detachedFilesCount);
+
     public class RequestUiTagsDictionaryMessage : RequestMessage<Dictionary<int, TagItemViewModel>> { }
 
     public enum ScanStatus

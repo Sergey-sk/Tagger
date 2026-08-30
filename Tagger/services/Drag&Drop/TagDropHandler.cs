@@ -6,9 +6,9 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Tagger.dto;
 using Tagger.messages;
-using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.viewmodel;
+using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.services
 {
@@ -38,9 +38,10 @@ namespace Tagger.services
 
             if (canDrop)
             {
-                dropInfo.Effects= DragDropEffects.Link;
+                dropInfo.Effects = DragDropEffects.Link;
                 dropInfo.DropTargetAdorner = DropTargetAdorners.Highlight;
-            }else
+            }
+            else
                 dropInfo.Effects = DragDropEffects.None;
         }
 
@@ -57,7 +58,7 @@ namespace Tagger.services
             {
                 tagsToApply.AddRange(listBox.SelectedItems.Cast<TagItemViewModel>());
             }
-            else 
+            else
                 tagsToApply.Add(targetTag);
 
             var tagIds = tagsToApply.Select(t => t.Id).ToList();

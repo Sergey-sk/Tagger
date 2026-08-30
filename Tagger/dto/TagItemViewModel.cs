@@ -19,8 +19,29 @@ namespace Tagger.viewmodel
         [ObservableProperty]
         private bool _isSelected;
 
-        [ObservableProperty]
-        private bool _isAttachedToSelectedFiles;
+        public bool IsAttachedToAllSelectedFiles
+        {
+            get
+            {
+                var files = _getSelectedFiles.Invoke();
+                if (files == null || files.Count == 0) return false;
+
+                return files.All(f => f.Tags.Any(t => t.Id == Id));
+            }
+        }
+
+        public bool IsAttachedToAnySelectedFiles
+        {
+            get
+            {
+                var files = _getSelectedFiles.Invoke();
+                if (files == null || files.Count == 0) return false;
+
+                return files.Any(f => f.Tags.Any(t => t.Id == Id));
+            }
+        }
+
+        public bool IsSelectionModeActive => _getSelectedFiles.Invoke().Count > 0;
 
         public TagItemViewModel(Tag model, Func<List<FileItemViewModel>> getSelectedFiles)
         {
@@ -35,6 +56,14 @@ namespace Tagger.viewmodel
         );
 
         public void IncrementFilesCount(int num = 1) => FilesCount += num;
-        public void DecrementFilesCount() => FilesCount--;
+        public void DecrementFilesCount(int num = 1) => FilesCount -= num;
+
+        public void RefreshSelectionState()
+        {
+            OnPropertyChanged(nameof(IsSelectionModeActive));
+            OnPropertyChanged(nameof(AssignmentPayload));
+            OnPropertyChanged(nameof(IsAttachedToAllSelectedFiles));
+            OnPropertyChanged(nameof(IsAttachedToAnySelectedFiles));
+        }
     }
 }
