@@ -12,6 +12,7 @@ namespace Tagger.viewmodel
         public ScannerViewModel.ScannerViewModel Scanner { get; set; }
         public FileViewerViewModel.FileViewerViewModel FileViewer { get; }
         public TagManagerViewModel.TagManagerViewModel TagManager { get; }
+        public InfoPanelViewModel.InfoPanelViewModel InfoPanel { get; }
 
 
         [ObservableProperty]
@@ -24,12 +25,14 @@ namespace Tagger.viewmodel
                              IScanningService scanningService,
                              ISavedSearchService savedSearchService,
                              IFileService fileService,
-                             IFileTagService fileTagService)
+                             IFileTagService fileTagService,
+                             IInfoPanelService infoPanelService)
         {
             FileViewer = new FileViewerViewModel.FileViewerViewModel(dialogService, fileService, fileTagService);
             Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService);
             Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService);
             TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService, fileTagService);
+            InfoPanel = new InfoPanelViewModel.InfoPanelViewModel(infoPanelService, dialogService);
 
             CurrentTheme = Properties.Settings.Default.Theme;
         }

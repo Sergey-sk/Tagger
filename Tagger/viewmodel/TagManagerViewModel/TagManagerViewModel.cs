@@ -107,12 +107,23 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
                     if (tag != null)
                     {
-                        tag.DecrementFilesCount(message.detachedFilesCount);
+                        tag.DecrementFilesCount(message.detachedFiles.Count);
                         SharedTagsForSelection.Remove(tag);
                     }
                 }
 
                 TagsView?.Refresh();
+            });
+
+            WeakReferenceMessenger.Default.Register<AddTagMessage>(this, (r, message) =>
+            {
+                message.Reply(CreateTagAsync(message.TagName));
+            });
+
+            WeakReferenceMessenger.Default.Register<RequestFilteredUITags>(this, (r, message) =>
+            {
+                var filteredTags = GetFilteredTags(message.Filter);
+                message.Reply(filteredTags);
             });
         }
 
@@ -132,7 +143,16 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 foreach (var uiTag in Tags)
                 {
                     if (addedTagIdsSet.Contains(uiTag.Id))
-                        uiTag.IncrementFilesCount(message.fileIds.Count);
+                    {
+                        if (addedTagIdsSet.Contains(uiTag.Id))
+                            uiTag.IncrementFilesCount(message.fileIds.Count);
+
+                        if (SharedTagsForSelection == null)
+                            SharedTagsForSelection = new ObservableCollection<TagItemViewModel>();
+
+                        if (!SharedTagsForSelection.Any(t => t.Id == uiTag.Id))
+                            SharedTagsForSelection.Add(uiTag);
+                    }
                 }
             }
             TagsView?.Refresh();
@@ -186,6 +206,13 @@ namespace Tagger.viewmodel.TagManagerViewModel
             CreateTagCommand.NotifyCanExecuteChanged();
         }
 
+        private List<string> GetFilteredTags(string filter)
+        {
+            return Tags.Where(t => t.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                       .Select(t => t.Name)
+                       .ToList();
+        }
+
         private bool FilterTags(object obj)
         {
             if (string.IsNullOrEmpty(SearchText)) return true;
@@ -221,31 +248,34 @@ namespace Tagger.viewmodel.TagManagerViewModel
         }
 
         [RelayCommand(CanExecute = nameof(CanCreateTag))]
-        private async Task CreateTagAsync()
+        private async Task<bool> CreateTagAsync(string tagName)
         {
             try
             {
-                var newTag = await _tagService.CreateTagAsync(SearchText.Trim());
+                var newTag = await _tagService.CreateTagAsync(tagName);
                 var viewModelTag = new TagItemViewModel(newTag, () => _selectedFiles.ToList());
 
                 Tags.Add(viewModelTag);
 
-                if (!SelectedTags.Contains(viewModelTag))
-                {
-                    SelectedTags.Add(viewModelTag);
-                    OnPropertyChanged(nameof(CurrentFilterStr));
-                }
+                //if (!SelectedTags.Contains(viewModelTag))
+                //{
+                //    SelectedTags.Add(viewModelTag);
+                //    OnPropertyChanged(nameof(CurrentFilterStr));
+                //}
 
                 SearchText = string.Empty;
+                return true;
             }
             catch (ArgumentException ex)
             {
                 SearchText = string.Empty;
                 _dialogService.ShowMessage(ex.Message, "Внимание!", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
             catch (Exception ex)
             {
                 _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 
@@ -321,7 +351,8 @@ namespace Tagger.viewmodel.TagManagerViewModel
                     if (SharedTagsForSelection == null)
                         SharedTagsForSelection = new ObservableCollection<TagItemViewModel>();
 
-                    SharedTagsForSelection.Add(uiTag);
+                    if (!SharedTagsForSelection.Any(t => t.Id == uiTag.Id))
+                        SharedTagsForSelection.Add(uiTag);
                 }
             }
 

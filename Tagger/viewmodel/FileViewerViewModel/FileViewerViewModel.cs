@@ -95,6 +95,9 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             WeakReferenceMessenger.Default.Register<ExecuteFileDrop>(this, async (r, message) =>
                 await ApplyTagsToFilesAsync(message.fileIds, message.uiTags));
+
+            WeakReferenceMessenger.Default.Register<DetachTagMessage>(this, (r, message) =>
+                DetachTagFromUIFiles(message.tagId, message.detachedFiles));
         }
 
         private void OnSelectedFilesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -104,10 +107,10 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             int previousCount = SelectedFiles.Count - (e.NewItems?.Count ?? 0) + (e.OldItems?.Count ?? 0);
 
-            if (SelectedFiles.Count > 0 && previousCount == 0) IsPanelOpen = true;
-            else if (SelectedFiles.Count == 0) IsPanelOpen = false;
+            //if (SelectedFiles.Count > 0 && previousCount == 0) IsPanelOpen = true;
+            //else if (SelectedFiles.Count == 0) IsPanelOpen = false;
 
-            WeakReferenceMessenger.Default.Send(new SelectedItemsChangedMessage(currentSelection));
+            WeakReferenceMessenger.Default.Send(new SelectedItemsChangedMessage(currentSelection, previousCount));
         }
 
         private async Task OnScanStateChanged(ScanStateChangedMessage message)
@@ -326,24 +329,10 @@ namespace Tagger.viewmodel.FileViewerViewModel
             catch (OperationCanceledException) { }
         }
 
-        [RelayCommand]
-        private void CloseOpenPanel() => IsPanelOpen = !IsPanelOpen;
-
-        [RelayCommand]
-        private async Task DetachTagFromFileAsync(int tagId)
+        private void DetachTagFromUIFiles(int tagId, HashSet<int> fileIdsSet)
         {
-            int attachedFilesCount = SelectedFiles.Count(f => f.Tags.Any(t => t.Id == tagId));
-            var result = _dialogService.ShowMessage($"Открепить тег от всех выбранных файлов? ({attachedFilesCount} шт.)",
-                                                     "Открепление тега",
-                                                     MessageBoxButton.YesNo,
-                                                     MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.No) return;
-            await _fileService.DetachTagFromFilesAsync(tagId, SelectedFiles.Select(f => f.Id).ToList());
-
+            InitializeGlobalUiTags();
             if (!globalUiTags.TryGetValue(tagId, out var uiTag)) return;
-
-            var fileIdsSet = SelectedFiles.Select(f => f.Id).ToHashSet();
 
             List<FileRecord> cachedFilesToUpdate = _cachedFiles
                 .Where(f => fileIdsSet.Contains(f.Id))
@@ -358,8 +347,6 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
             foreach (var uiFile in uiFilesToUpdate)
                 uiFile.Tags.Remove(uiTag);
-
-            WeakReferenceMessenger.Default.Send(new DetachTagMessage(tagId, attachedFilesCount));
         }
 
         /// <summary>

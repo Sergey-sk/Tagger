@@ -19,7 +19,7 @@ namespace Tagger.messages
 
     public record ApplyTagToSearch(List<TagItemViewModel> tags);
 
-    public record SelectedItemsChangedMessage(List<FileItemViewModel> selectedItems);
+    public record SelectedItemsChangedMessage(List<FileItemViewModel> selectedItems, int previousCount);
 
     public record ChangeProgressStatus(bool isLoading, string value);
 
@@ -33,9 +33,19 @@ namespace Tagger.messages
 
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
 
-    public record DetachTagMessage(int tagId, int detachedFilesCount);
+    public record DetachTagMessage(int tagId, HashSet<int> detachedFiles);
+
+    public class AddTagMessage(string tagName) : AsyncRequestMessage<bool>()
+    {
+        public string TagName { get; } = tagName;
+    }
 
     public class RequestUiTagsDictionaryMessage : RequestMessage<Dictionary<int, TagItemViewModel>> { }
+
+    public class RequestFilteredUITags(string filter) : AsyncRequestMessage<List<string>>
+    {
+        public string Filter { get; } = filter;
+    }
 
     public enum ScanStatus
     {
