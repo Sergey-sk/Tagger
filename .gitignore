@@ -13,6 +13,7 @@ obj/
 *.mdf
 *.ldf
 *.sdf
+*.exe
 
 packages/
 *.nupkg

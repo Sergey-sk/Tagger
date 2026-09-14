@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using System.IO;
 using Tagger.model;
 
-namespace Tagger
+namespace Tagger.db
 {
     public class ApplicationDbContext : DbContext
     {

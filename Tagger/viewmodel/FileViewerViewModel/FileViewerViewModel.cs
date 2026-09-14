@@ -11,6 +11,7 @@ using Tagger.messages;
 using Tagger.model;
 using Tagger.services;
 using Tagger.services.Drag_Drop;
+using Tagger.services.implementations;
 using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.FileViewerViewModel
@@ -22,6 +23,7 @@ namespace Tagger.viewmodel.FileViewerViewModel
         private readonly IDialogService _dialogService;
         private readonly IFileService _fileService;
         private readonly IFileTagService _fileTagService;
+        private readonly AppSettingsService _appSettingsService;
 
         public IDragSource DragHandler { get; }
         public IDropTarget DropHandler { get; }
@@ -52,16 +54,17 @@ namespace Tagger.viewmodel.FileViewerViewModel
 
         public FileViewerViewModel(IDialogService dialogService,
                                    IFileService fileService,
-                                   IFileTagService fileTagService)
+                                   IFileTagService fileTagService,
+                                   AppSettingsService appSettingsService)
         {
             _dialogService = dialogService;
             _fileService = fileService;
             _fileTagService = fileTagService;
-
+            _appSettingsService = appSettingsService;
             DragHandler = new FileDragHandler(dialogService);
             DropHandler = new FileDropHandler();
 
-            _currentActivePath = Properties.Settings.Default.FolderPath;
+            _currentActivePath = _appSettingsService.GetSetting("FolderPath");
 
             InitializeGlobalUiTags();
 

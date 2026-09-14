@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using Tagger.db;
 using Tagger.model;
 using Tagger.services.interfaces;
 

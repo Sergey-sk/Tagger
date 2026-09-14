@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.ObjectModel;
@@ -6,6 +6,7 @@ using System.IO;
 using System.Windows;
 using Tagger.messages;
 using Tagger.model;
+using Tagger.services.implementations;
 using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.WorkspaceViewModel
@@ -14,7 +15,7 @@ namespace Tagger.viewmodel.WorkspaceViewModel
     {
         private readonly IDialogService _dialogService;
         private readonly ISavedSearchService _savedSearchService;
-
+        private readonly AppSettingsService _appSettingsService;
         private string _searchText;
 
         [ObservableProperty]
@@ -33,16 +34,23 @@ namespace Tagger.viewmodel.WorkspaceViewModel
         private ObservableCollection<string> _quickAccess = new();
 
         public WorkspaceViewModel(IDialogService dialogService,
-                                  ISavedSearchService savedSearchService)
+                                  ISavedSearchService savedSearchService,
+                                  AppSettingsService appSettingsService)
         {
             _dialogService = dialogService;
             _savedSearchService = savedSearchService;
+            _appSettingsService = appSettingsService;
 
             LoadQuickAccess();
 
-            CurrentPath = Directory.Exists(Properties.Settings.Default.FolderPath)
-                ? Properties.Settings.Default.FolderPath
+            var folderPath = _appSettingsService.GetSetting("FolderPath");
+            CurrentPath = Directory.Exists(folderPath)
+                ? folderPath
                 : "Не указана";
+
+            //CurrentPath = Directory.Exists(Properties.Settings.Default.FolderPath)
+            //    ? Properties.Settings.Default.FolderPath
+            //    : "Не указана";
 
             WeakReferenceMessenger.Default.Register<SearchToSaveMessage>(this, (r, message) =>
             {
@@ -52,7 +60,8 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         private void LoadQuickAccess()
         {
-            string rawFolders = Properties.Settings.Default.RecentFoldersRaw;
+            //Properties.Settings.Default.RecentFoldersRaw
+            string rawFolders = _appSettingsService.GetSetting("RecentFoldersRaw");
 
             if (!string.IsNullOrEmpty(rawFolders))
             {
@@ -94,9 +103,12 @@ namespace Tagger.viewmodel.WorkspaceViewModel
                 QuickAccess.Move(QuickAccess.IndexOf(value), 0);
             }
 
-            Properties.Settings.Default.FolderPath = value;
-            Properties.Settings.Default.RecentFoldersRaw = string.Join(";", QuickAccess);
-            Properties.Settings.Default.Save();
+            _appSettingsService.SetSetting("FolderPath", value);
+            _appSettingsService.SetSetting("RecentFoldersRaw", string.Join(";", QuickAccess));
+            _appSettingsService.SaveSettings();
+            //Properties.Settings.Default.FolderPath = value;
+            //Properties.Settings.Default.RecentFoldersRaw = string.Join(";", QuickAccess);
+            //Properties.Settings.Default.Save();
 
             WeakReferenceMessenger.Default.Send(new FolderChangedMessage(value));
         }
@@ -108,7 +120,7 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         partial void OnSelectedQuickAccessPathChanged(string value)
         {
-            if (CurrentPath != value && !string.IsNullOrEmpty(value))
+            if (CurrentPath != value && !string.IsNullOrEmpty(value) && Directory.Exists(value))
                 CurrentPath = value;
         }
 

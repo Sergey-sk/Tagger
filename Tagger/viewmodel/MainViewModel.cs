@@ -2,12 +2,15 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using System.Windows;
+using Tagger.db;
+using Tagger.services.implementations;
 using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel
 {
     public partial class MainViewModel : ObservableObject
     {
+        private readonly AppSettingsService _appSettingsService;
         public WorkspaceViewModel.WorkspaceViewModel Workspace { get; }
         public ScannerViewModel.ScannerViewModel Scanner { get; set; }
         public FileViewerViewModel.FileViewerViewModel FileViewer { get; }
@@ -26,15 +29,19 @@ namespace Tagger.viewmodel
                              ISavedSearchService savedSearchService,
                              IFileService fileService,
                              IFileTagService fileTagService,
-                             IInfoPanelService infoPanelService)
+                             IInfoPanelService infoPanelService,
+                             AppSettingsService appSettingsService)
         {
-            FileViewer = new FileViewerViewModel.FileViewerViewModel(dialogService, fileService, fileTagService);
-            Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService);
-            Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService);
+            _appSettingsService = appSettingsService;
+
+            FileViewer = new FileViewerViewModel.FileViewerViewModel(dialogService, fileService, fileTagService, appSettingsService);
+            Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService, appSettingsService);
+            Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService, appSettingsService);
             TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService, fileTagService);
             InfoPanel = new InfoPanelViewModel.InfoPanelViewModel(infoPanelService, dialogService);
 
-            CurrentTheme = Properties.Settings.Default.Theme;
+            CurrentTheme = _appSettingsService.GetSetting("Theme", "System");
+            //CurrentTheme = Properties.Settings.Default.Theme;
         }
         partial void OnCurrentThemeChanging(string value)
         {
@@ -74,8 +81,10 @@ namespace Tagger.viewmodel
         private void ChangeTheme(string theme)
         {
             CurrentTheme = theme;
-            Properties.Settings.Default.Theme = theme;
-            Properties.Settings.Default.Save();
+            _appSettingsService.SetSetting("Theme", theme);
+            _appSettingsService.SaveSettings();
+            //Properties.Settings.Default.Theme = theme;
+            //Properties.Settings.Default.Save();
         }
     }
 }

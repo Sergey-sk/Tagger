@@ -5,6 +5,7 @@ using System.IO;
 using System.Windows;
 using Tagger.messages;
 using Tagger.model;
+using Tagger.services.implementations;
 using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.ScannerViewModel
@@ -13,7 +14,7 @@ namespace Tagger.viewmodel.ScannerViewModel
     {
         private readonly IDialogService _dialogService;
         private readonly IScanningService _scanningService;
-
+        private readonly AppSettingsService _appSettingsService;
         private string _currentActivePath;
         private bool _isCancelingByFolderChange;
         private bool _changeStatus;
@@ -25,10 +26,11 @@ namespace Tagger.viewmodel.ScannerViewModel
         [NotifyCanExecuteChangedFor(nameof(StartScanCommand))]
         private bool _isScaning;
 
-        public ScannerViewModel(IDialogService dialogService, IScanningService scanningService)
+        public ScannerViewModel(IDialogService dialogService, IScanningService scanningService, AppSettingsService appSettingsService)
         {
             _dialogService = dialogService;
             _scanningService = scanningService;
+            _appSettingsService = appSettingsService;
 
             WeakReferenceMessenger.Default.Register(this);
 
@@ -39,7 +41,7 @@ namespace Tagger.viewmodel.ScannerViewModel
                 _changeStatus = false;
             });
 
-            _currentActivePath = Properties.Settings.Default.FolderPath;
+            _currentActivePath = _appSettingsService.GetSetting("FolderPath");
         }
 
         [RelayCommand(CanExecute = nameof(ScanCanExecute), IncludeCancelCommand = true)]

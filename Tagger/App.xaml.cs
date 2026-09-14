@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using System.Configuration;
 using System.Data;
 using System.Windows;
+using Tagger.db;
 using Tagger.services.implementations;
 using Tagger.services.interfaces;
 using Tagger.viewmodel;
@@ -25,10 +26,11 @@ namespace Tagger
                 {
                     services.AddDbContextFactory<ApplicationDbContext>(options =>
                     {
-                        var connectionString = context.Configuration.GetConnectionString("DefaultConnection");
+                        var connectionString = DatabaseConfig.GetConnectionString();
                         options.UseSqlite(connectionString);
                     });
 
+                    services.AddSingleton<AppSettingsService>();
                     services.AddSingleton<IDialogService, DialogService>();
                     services.AddSingleton<MainViewModel>();
 
