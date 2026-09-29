@@ -389,49 +389,10 @@
                                                            HorizontalAlignment="Center"
                                                            FontWeight="SemiBold"
                                                            Opacity="0.75"/>
-
-                                                <!--<CheckBox Grid.Column="1"
-                                                          x:Name="tagCheckBox"
-                                                          Opacity="0"
-                                                          IsHitTestVisible="False"
-                                                          IsThreeState="True"
-                                                          IsChecked="{Binding IsAttachedToSelectedFiles, Mode=TwoWay}"
-                                                          VerticalAlignment="Center"
-                                                          HorizontalAlignment="Left"/>-->
                                             </Grid>
                                         </Border>
 
                                         <ControlTemplate.Triggers>
-                                            <!--<DataTrigger Binding="{Binding IsSelectionModeActive}" Value="True">
-                                                <Setter TargetName="tagCheckBox" Property="IsHitTestVisible" Value="True"/>
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="tagFilesCount"
-                                                                             Storyboard.TargetProperty="Opacity"
-                                                                             To="0" Duration="0:0:0.2"/>
-                                                            
-                                                            <DoubleAnimation Storyboard.TargetName="tagCheckBox"
-                                                                             Storyboard.TargetProperty="Opacity"
-                                                                             To="1" Duration="0:0:0.2"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-
-                                                <DataTrigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="tagFilesCount"
-                                                                             Storyboard.TargetProperty="Opacity"
-                                                                             To="0.75" Duration="0:0:0.2"/>
-                                                            
-                                                            <DoubleAnimation Storyboard.TargetName="tagCheckBox"
-                                                                             Storyboard.TargetProperty="Opacity"
-                                                                             To="0" Duration="0:0:0.2"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.ExitActions>
-                                            </DataTrigger>-->
 
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="tagBorder" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>

@@ -24,5 +24,10 @@ namespace Tagger.view
         }
 
         public ListView FileListView => listView;
+
+        private void listView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
     }
 }

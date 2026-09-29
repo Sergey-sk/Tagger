@@ -25,7 +25,7 @@ namespace Tagger.messages
 
     public record ApplyTagMessage(List<int> tagIds, List<int> fileIds);
     public record ApplyFileMessage(List<int> tagIds, List<int> fileIds);
-    public record RemoveTagMessage(int tagId);
+    public record RemoveTagMessage(HashSet<int> tagIds);
 
     public record ExecuteTagDrop(TagAssignmentPayload assignmentPayload);
     public record ExecuteFileDrop(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags);

@@ -8,9 +8,9 @@ namespace Tagger.services.interfaces
     {
         Task<List<Tag>> LoadTagsAsync();
         Task<Tag> CreateTagAsync(string tagName);
-        Task RemoveTagAsync(int tagId);
+        Task RemoveTagsAsync(HashSet<int> tagId);
         Task<List<int>> GetFileIdsByPathAsync(List<string> paths);
         Task<List<FileRecord>> GetFilesByIdsAsync(List<int> fileIds);
-        Task<int> GetFilesCountByTagId(int tagId);
+        Task<int> GetFilesCountByTagIds(HashSet<int> tagId);
     }
 }

@@ -65,12 +65,12 @@ namespace Tagger.services.implementations
             return newTag;
         }
 
-        public async Task RemoveTagAsync(int tagId)
+        public async Task RemoveTagsAsync(HashSet<int> tagIds)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
 
             await context.Tags
-                .Where(t => t.Id == tagId)
+                .Where(t => tagIds.Contains(t.Id))
                 .ExecuteDeleteAsync();
         }
 
@@ -92,13 +92,17 @@ namespace Tagger.services.implementations
                 .ToListAsync();
         }
 
-        public async Task<int> GetFilesCountByTagId(int tagId)
+        //TODO **
+        public async Task<int> GetFilesCountByTagIds(HashSet<int> tagIds)
         {
             var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Tags
-                .Where(t => t.Id == tagId)
+
+            var list = await context.Tags
+                .Where(t => tagIds.Contains(t.Id))
                 .Select(t => t.Files.Count)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+
+            return list[0];
         }
     }
 }

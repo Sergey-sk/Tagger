@@ -164,7 +164,22 @@
                         <Setter Property="BorderThickness" Value="0"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Tag" Value="{Binding DataContext.FileViewer, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                         <Setter Property="BorderBrush" Value="{DynamicResource TextControlElevationBorderBrush}"/>
+                        <EventSetter Event="PreviewMouseDoubleClick" Handler="listView_PreviewMouseDoubleClick"/>
+                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="listView_PreviewMouseDoubleClick"/>
+                        <Setter Property="ContextMenu">
+                            <Setter.Value>
+                                <ContextMenu>
+                                    <MenuItem Header="Открыть"
+                                              Command="{Binding PlacementTarget.Tag.OpenFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding Id}"/>
+                                    <MenuItem Header="Открепить все теги"
+                                              Command="{Binding PlacementTarget.FileViewer.DetachTagsFromFileCommand}"
+                                              CommandParameter="{Binding Id}"/>
+                                </ContextMenu>
+                            </Setter.Value>
+                        </Setter>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListViewItem">

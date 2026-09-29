@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using GongSolutions.Wpf.DragDrop;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows;
@@ -201,13 +200,14 @@ namespace Tagger.viewmodel.FileViewerViewModel
         {
             foreach (var file in _cachedFiles)
             {
-                file.Tags.RemoveAll(t => t.Id == message.tagId);
+                file.Tags.RemoveAll(t => message.tagIds.Contains(t.Id));
             }
 
-            _selectedTags.RemoveAll(t => t.Id == message.tagId);
+            _selectedTags.RemoveAll(t => message.tagIds.Contains(t.Id));
             OnPropertyChanged(nameof(IsSearching));
 
-            globalUiTags.Remove(message.tagId);
+            foreach (var tag in message.tagIds)
+                globalUiTags.Remove(tag);
 
             await TriggerSearchWithDebounceAsync();
         }
@@ -380,13 +380,13 @@ namespace Tagger.viewmodel.FileViewerViewModel
         {
             var uiFiles = Files.Where(f => fileIds.Contains(f.Id)).ToList();
 
-            foreach(var uiFile in uiFiles)
+            foreach (var uiFile in uiFiles)
             {
-                if(uiFile != null)
+                if (uiFile != null)
                 {
-                    foreach(var uiTag in uiTagsToAdd)
+                    foreach (var uiTag in uiTagsToAdd)
                     {
-                        if(!uiFile.Tags.Any(t => t.Id == uiTag.Id))
+                        if (!uiFile.Tags.Any(t => t.Id == uiTag.Id))
                             uiFile.Tags.Add(uiTag);
                     }
                 }

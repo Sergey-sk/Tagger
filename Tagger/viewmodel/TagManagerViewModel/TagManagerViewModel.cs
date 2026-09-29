@@ -284,25 +284,37 @@ namespace Tagger.viewmodel.TagManagerViewModel
         [RelayCommand]
         private async Task RemoveTagAsync(int tagId)
         {
-            int filesCount = await _tagService.GetFilesCountByTagId(tagId);
+            var tagIdsList = SelectedTags.Select(t => t.Id).Count() == 0 ? [tagId] : SelectedTags.Select(t => t.Id).ToList();
+            var tagIds = tagIdsList.ToHashSet();
 
-            var result = _dialogService.ShowMessage($"Удалить тег? ({filesCount} файлов)", "Удаление тега", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            int filesCount = await _tagService.GetFilesCountByTagIds(tagIds);
+            string message;
+
+            if (SelectedTags.Count == 1)
+                message = $"Удалить тег? ({filesCount} файлов)";
+            else
+                message = $"Удалить теги? ({filesCount} файлов)";
+
+            var result = _dialogService.ShowMessage(message, "Удаление тегов", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (result == MessageBoxResult.No) return;
 
             try
             {
-                await _tagService.RemoveTagAsync(tagId);
+                await _tagService.RemoveTagsAsync(tagIds);
 
-                var tagInUI = Tags.FirstOrDefault(t => t.Id == tagId);
-                if (tagInUI != null)
+                var tagsInUI = Tags.Where(t => tagIds.Contains(t.Id)).ToList();
+                if (tagsInUI != null && tagsInUI.Count != 0)
                 {
-                    Tags.Remove(tagInUI);
-                    if (SelectedTags.Contains(tagInUI))
-                        SelectedTags.Remove(tagInUI);
+                    foreach (var tag in tagsInUI)
+                    {
+                        Tags.Remove(tag);
+                        if (SelectedTags.Contains(tag))
+                            SelectedTags.Remove(tag);
+                    }
                 }
 
-                WeakReferenceMessenger.Default.Send(new RemoveTagMessage(tagId));
+                WeakReferenceMessenger.Default.Send(new RemoveTagMessage(tagIds));
             }
             catch (Exception ex)
             {
