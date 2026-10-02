@@ -92,17 +92,16 @@ namespace Tagger.services.implementations
                 .ToListAsync();
         }
 
-        //TODO **
         public async Task<int> GetFilesCountByTagIds(HashSet<int> tagIds)
         {
             var context = await _contextFactory.CreateDbContextAsync();
 
             var list = await context.Tags
                 .Where(t => tagIds.Contains(t.Id))
-                .Select(t => t.Files.Count)
-                .ToListAsync();
+                .SelectMany(t => t.Files)
+                .CountAsync();
 
-            return list[0];
+            return list;
         }
     }
 }

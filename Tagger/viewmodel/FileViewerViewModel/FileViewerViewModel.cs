@@ -332,6 +332,22 @@ namespace Tagger.viewmodel.FileViewerViewModel
             catch (OperationCanceledException) { }
         }
 
+        [RelayCommand]
+        private async Task OpenFileAsync(FileItemViewModel file)
+        {
+            if(file == null)
+            {
+                _dialogService.ShowMessage($"Файл не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = file.Path,
+                UseShellExecute = true
+            });
+        }
+
         private void DetachTagFromUIFiles(int tagId, HashSet<int> fileIdsSet)
         {
             InitializeGlobalUiTags();

@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:Tagger.view"
              xmlns:nmsp="clr-namespace:Tagger.viewmodel"
+             xmlns:services="clr-namespace:Tagger.services"
              xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
              xmlns:dd="urn:gong-wpf-dragdrop"
              mc:Ignorable="d" 
@@ -166,14 +167,13 @@
                         <Setter Property="VerticalContentAlignment" Value="Center"/>
                         <Setter Property="Tag" Value="{Binding DataContext.FileViewer, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                         <Setter Property="BorderBrush" Value="{DynamicResource TextControlElevationBorderBrush}"/>
-                        <EventSetter Event="PreviewMouseDoubleClick" Handler="listView_PreviewMouseDoubleClick"/>
-                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="listView_PreviewMouseDoubleClick"/>
+                        <!--<EventSetter Event="PreviewMouseRightButtonDown" Handler="listView_PreviewMouseDoubleClick"/>-->
                         <Setter Property="ContextMenu">
                             <Setter.Value>
                                 <ContextMenu>
                                     <MenuItem Header="Открыть"
                                               Command="{Binding PlacementTarget.Tag.OpenFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                              CommandParameter="{Binding Id}"/>
+                                              CommandParameter="{Binding}"/>
                                     <MenuItem Header="Открепить все теги"
                                               Command="{Binding PlacementTarget.FileViewer.DetachTagsFromFileCommand}"
                                               CommandParameter="{Binding Id}"/>
@@ -190,9 +190,18 @@
                                                 BorderThickness="{TemplateBinding BorderThickness}"
                                                 Padding="{TemplateBinding Padding}"
                                                 CornerRadius="4">
+
+                                            <i:Interaction.Behaviors>
+                                                <services:MouseDoubleClickCommandBehavior
+                                                    Command="{Binding Tag.OpenFileCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ListViewItem}}"
+                                                    CommandParameter="{Binding}" />
+                                            </i:Interaction.Behaviors>
+
                                             <GridViewRowPresenter 
                                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                                         </Border>
+                                        
 
                                         <Rectangle x:Name="selectionIndicator"
                                                    Width="3"
