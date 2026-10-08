@@ -11,10 +11,12 @@ namespace Tagger.services.implementations
     public class InfoPanelService : IInfoPanelService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ITagService _tagService;
 
-        public InfoPanelService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public InfoPanelService(IDbContextFactory<ApplicationDbContext> contextFactory, ITagService tagService)
         {
             _contextFactory = contextFactory;
+            _tagService = tagService;
         }
         public async Task DetachTagFromFilesAsync(int tagId, List<int> fileIds)
         {
@@ -25,7 +27,7 @@ namespace Tagger.services.implementations
                 .ExecuteDeleteAsync();
         }
 
-        public async Task<int> AttachTagToFilesAsync(string tagName, List<FileItemViewModel> filesToAttach)
+        public async Task<int> AttachTagToFilesAsync(string tagName, List<int> fileIdsToAttach)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
 
@@ -44,7 +46,7 @@ namespace Tagger.services.implementations
                 if (tag == null) return -1;
             }
 
-            var fileIds = filesToAttach.Select(f => f.Id).ToHashSet();
+            var fileIds = fileIdsToAttach.ToHashSet();
             var existingFileTags = await context.FileTags
                 .Where(ft => ft.TagId == tag.Id && fileIds.Contains(ft.FileId))
                 .Select(ft => ValueTuple.Create(ft.TagId, ft.FileId))
@@ -52,9 +54,9 @@ namespace Tagger.services.implementations
 
             List<FileTag> fileTags = [];
 
-            foreach (var file in filesToAttach)
+            foreach (var file in fileIdsToAttach)
             {
-                var newFileTag = ValueTuple.Create(tag.Id, file.Id);
+                var newFileTag = ValueTuple.Create(tag.Id, file);
                 if (!existingFileTags.Contains(newFileTag))
                     fileTags.Add(new FileTag { TagId = newFileTag.Item1, FileId = newFileTag.Item2 });
             }

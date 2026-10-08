@@ -217,7 +217,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
         {
             if (string.IsNullOrEmpty(SearchText)) return true;
 
-            if (obj is Tag tag)
+            if (obj is TagItemViewModel tag)
             {
                 return tag.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
             }
@@ -247,21 +247,18 @@ namespace Tagger.viewmodel.TagManagerViewModel
             }
         }
 
-        [RelayCommand(CanExecute = nameof(CanCreateTag))]
+        //[RelayCommand(CanExecute = nameof(CanCreateTag))]
+        [RelayCommand]
         private async Task<bool> CreateTagAsync(string tagName)
         {
+            if (string.IsNullOrWhiteSpace(SearchText)) return false;
+
             try
             {
                 var newTag = await _tagService.CreateTagAsync(tagName);
                 var viewModelTag = new TagItemViewModel(newTag, () => _selectedFiles.ToList());
 
                 Tags.Add(viewModelTag);
-
-                //if (!SelectedTags.Contains(viewModelTag))
-                //{
-                //    SelectedTags.Add(viewModelTag);
-                //    OnPropertyChanged(nameof(CurrentFilterStr));
-                //}
 
                 SearchText = string.Empty;
                 return true;

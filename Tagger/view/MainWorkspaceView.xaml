@@ -118,7 +118,7 @@
 
                 <DockPanel Margin="0,5">
                     <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Padding="10,3">
-                    <Run Text="&#xE71C;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+                    <Run Text="&#xE71C;" FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="12"/>
                     <Run Text="Текущий фильтр: "/>
                 </TextBlock>
                 <TextBox DockPanel.Dock="Left"

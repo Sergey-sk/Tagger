@@ -11,6 +11,7 @@ namespace Tagger.db
         public DbSet<Tag> Tags { get; set; } = null!;
         public DbSet<SavedSearch> SavedSearches { get; set; } = null!;
         public DbSet<FileTag> FileTags { get; set; } = null!;
+        public DbSet<TempScannedFile> TempScannedFiles { get; set; } = null!;
 
         public ApplicationDbContext() : base()
         {
@@ -59,6 +60,12 @@ namespace Tagger.db
                                 j.HasKey(ft => new { ft.FileId, ft.TagId });
                             }
                       );
+            });
+
+            modelBuilder.Entity<TempScannedFile>(entity =>
+            {
+                entity.ToTable("TempScannedFiles");
+                entity.HasKey(tsf => tsf.Path);
             });
         }
     }

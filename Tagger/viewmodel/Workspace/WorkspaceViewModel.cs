@@ -87,7 +87,7 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         partial void OnCurrentPathChanged(string value)
         {
-            if (string.IsNullOrEmpty(value) || value == "Не выбрана") return;
+            if (string.IsNullOrEmpty(value) || value == "Не выбрана" || value == "Не указана") return;
 
             LoadSearchForPathCommand.ExecuteAsync(value);
 

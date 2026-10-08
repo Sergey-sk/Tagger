@@ -1,10 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.EntityFrameworkCore;
 using System.Windows;
-using Tagger.db;
 using Tagger.services.implementations;
-using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel
 {
@@ -21,27 +18,23 @@ namespace Tagger.viewmodel
         [ObservableProperty]
         private string _currentTheme = "System";
 
-        public MainViewModel(IDialogService dialogService,
-                             IDbContextFactory<ApplicationDbContext> contextFactory,
-                             ITagService tagService,
-                             IFileIndexingService fileIndexingService,
-                             IScanningService scanningService,
-                             ISavedSearchService savedSearchService,
-                             IFileService fileService,
-                             IFileTagService fileTagService,
-                             IInfoPanelService infoPanelService,
+        public MainViewModel(FileViewerViewModel.FileViewerViewModel fileViewer,
+                             WorkspaceViewModel.WorkspaceViewModel workspace,
+                             ScannerViewModel.ScannerViewModel scanner,
+                             TagManagerViewModel.TagManagerViewModel tagManager,
+                             InfoPanelViewModel.InfoPanelViewModel infoPanel,
                              AppSettingsService appSettingsService)
         {
             _appSettingsService = appSettingsService;
 
-            FileViewer = new FileViewerViewModel.FileViewerViewModel(dialogService, fileService, fileTagService, appSettingsService);
-            Workspace = new WorkspaceViewModel.WorkspaceViewModel(dialogService, savedSearchService, appSettingsService);
-            Scanner = new ScannerViewModel.ScannerViewModel(dialogService, scanningService, appSettingsService);
-            TagManager = new TagManagerViewModel.TagManagerViewModel( dialogService, tagService, fileIndexingService, fileTagService);
-            InfoPanel = new InfoPanelViewModel.InfoPanelViewModel(infoPanelService, dialogService);
+            FileViewer = fileViewer;
+            Workspace = workspace;
+            Scanner = scanner;
+            Scanner = scanner;
+            TagManager = tagManager;
+            InfoPanel = infoPanel;
 
             CurrentTheme = _appSettingsService.GetSetting("Theme", "System");
-            //CurrentTheme = Properties.Settings.Default.Theme;
         }
         partial void OnCurrentThemeChanging(string value)
         {
@@ -83,8 +76,6 @@ namespace Tagger.viewmodel
             CurrentTheme = theme;
             _appSettingsService.SetSetting("Theme", theme);
             _appSettingsService.SaveSettings();
-            //Properties.Settings.Default.Theme = theme;
-            //Properties.Settings.Default.Save();
         }
     }
 }

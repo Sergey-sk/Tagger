@@ -18,6 +18,7 @@ namespace Tagger.viewmodel.ScannerViewModel
         private string _currentActivePath;
         private bool _isCancelingByFolderChange;
         private bool _changeStatus;
+        private string _lastSuccessScaningTime;
 
         [ObservableProperty]
         private string _progressStatus = "Готов к сканированию";
@@ -42,6 +43,7 @@ namespace Tagger.viewmodel.ScannerViewModel
             });
 
             _currentActivePath = _appSettingsService.GetSetting("FolderPath");
+            _lastSuccessScaningTime = _appSettingsService.GetSetting("LastSuccessScanTime");
         }
 
         [RelayCommand(CanExecute = nameof(ScanCanExecute), IncludeCancelCommand = true)]
@@ -65,7 +67,7 @@ namespace Tagger.viewmodel.ScannerViewModel
             {
                 if (files.Count > 0)
                 {
-                    totalScannedCount += files.Count;
+                    totalScannedCount += (int)files[0].Size;
                     if (_changeStatus) ProgressStatus = $"Найдено файлов: {totalScannedCount:N0}";
                     WeakReferenceMessenger.Default.Send(new FilesScannedBatchMessage(files));
                 }
@@ -75,10 +77,16 @@ namespace Tagger.viewmodel.ScannerViewModel
             {
                 WeakReferenceMessenger.Default.Send(new ScanStateChangedMessage(ScanStatus.Started, _currentActivePath));
 
-                await _scanningService.ScanDirectoryAsync(_currentActivePath, progress, token);
+                await Task.Run(async () =>
+                {
+                    await _scanningService.ScanDirectoryAsync(_currentActivePath, _lastSuccessScaningTime, progress, token);
+                }, token);
 
                 WeakReferenceMessenger.Default.Send(new ScanStateChangedMessage(ScanStatus.Finished, _currentActivePath));
                 ProgressStatus = "Сканирование успешно завершено!";
+
+                _lastSuccessScaningTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                _appSettingsService.SetSetting("LastSuccessScanTime", _lastSuccessScaningTime);
             }
             catch (OperationCanceledException)
             {
@@ -106,9 +114,10 @@ namespace Tagger.viewmodel.ScannerViewModel
 
         private bool ScanCanExecute() =>
             !IsScaning &&
+            !string.IsNullOrEmpty(_currentActivePath) &&
             Directory.Exists(_currentActivePath) &&
-            !string.IsNullOrEmpty(_currentActivePath)
-            && _currentActivePath != "Не выбрана";
+            _currentActivePath != "Не выбрана" &&
+            _currentActivePath != "Не указана";
 
         public void Receive(FolderChangedMessage message)
         {

@@ -9,7 +9,7 @@ namespace Tagger.db
     {
         public static string GetConnectionString()
         {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "Tagger");
 
             Directory.CreateDirectory(appFolderPath);

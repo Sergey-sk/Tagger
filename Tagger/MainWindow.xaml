@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Tagger"
         xmlns:view="clr-namespace:Tagger.view"
+        xmlns:leftview="clr-namespace:Tagger.view.LeftSideBar"
         mc:Ignorable="d"
         Title="Tagger" Height="450" MinWidth="850" Width="850" WindowStartupLocation="CenterScreen"
         Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"
@@ -75,7 +76,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <view:LeftSideBarView x:Name="leftSide"
+                <leftview:LeftSideBarView x:Name="leftSide"
                                       Grid.Column="0"/>
 
                 <GridSplitter Grid.Column="1"

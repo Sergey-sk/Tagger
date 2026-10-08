@@ -142,7 +142,7 @@ namespace Tagger.viewmodel.InfoPanelViewModel
         {
             if (string.IsNullOrWhiteSpace(SearchTagNameText)) return;
 
-            int tagId = await _infoPanelService.AttachTagToFilesAsync(SearchTagNameText, selectedFiles.ToList());
+            int tagId = await _infoPanelService.AttachTagToFilesAsync(SearchTagNameText, selectedFiles.Select(f => f.Id).ToList());
 
             if (tagId == -1)
             {

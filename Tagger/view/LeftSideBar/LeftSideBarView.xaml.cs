@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace Tagger.view
+namespace Tagger.view.LeftSideBar
 {
     /// <summary>
     /// Логика взаимодействия для LeftSideBarView.xaml
