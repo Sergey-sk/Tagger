@@ -17,22 +17,31 @@ namespace Tagger.services.implementations
             _contextFactory = contextFactory;
         }
 
-        public async Task ScanDirectoryAsync(string path, string lastSuccessScanTime, IProgress<List<FileRecord>> progress, CancellationToken cancellationToken)
+        public async Task ScanDirectoryAsync(string path, string lastSuccessScanTime, IProgress<int> progress, CancellationToken cancellationToken)
         {
-            var filesChannel = Channel.CreateUnbounded<string>();
+            var filesChannel = Channel.CreateUnbounded<(string filePaths, DateTime lastWriteTime, long fileSize)>();
 
-            var dbWorkerTask = WriteToDbAsync(path, filesChannel, progress, cancellationToken);
+            var dbWorkerTask = WriteToDbAsync(path, lastSuccessScanTime, filesChannel, progress, cancellationToken);
             var scanTask = ScanFilesAsync(path, lastSuccessScanTime, filesChannel, cancellationToken);
 
-            await Task.WhenAll(scanTask, dbWorkerTask);
+            try
+            {
+                await Task.WhenAll(scanTask, dbWorkerTask);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
         }
 
-        private async Task ScanFilesAsync(string path, string lastSuccessScanTime, Channel<string> filesChannel, CancellationToken cancellationToken)
+        private async Task ScanFilesAsync(string path,
+                                          string lastSuccessScanTime,
+                                          Channel<(string filePath, DateTime lastWriteTime, long fileSize)> filesChannel,
+                                          CancellationToken cancellationToken)
         {
             try
             {
-                //var lastTime = string.IsNullOrEmpty(lastSuccessScanTime) ? DateTime.MinValue : DateTime.Parse(lastSuccessScanTime);
-                var lastTime = DateTime.MinValue;
+                var lastTime = string.IsNullOrEmpty(lastSuccessScanTime) ? DateTime.MinValue : DateTime.Parse(lastSuccessScanTime);
                 List<DirectoryInfo> tasks = [];
                 DirectoryInfo rootDir = new DirectoryInfo(path);
 
@@ -63,9 +72,7 @@ namespace Tagger.services.implementations
                         foreach (var file in subDir.EnumerateFiles("*", enumerationOptions))
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (file.LastWriteTime < lastTime)
-                                continue;
-                            await filesChannel.Writer.WriteAsync(file.FullName, token);
+                            await filesChannel.Writer.WriteAsync((file.FullName, file.LastWriteTime, file.Length), token);
                         }
                     }
                     catch (OperationCanceledException)
@@ -83,37 +90,41 @@ namespace Tagger.services.implementations
             catch (Exception)
             {
                 filesChannel.Writer.TryComplete();
-                throw;
             }
         }
 
-        public async Task WriteToDbAsync(string rootPath, Channel<string> filesChannel, IProgress<List<FileRecord>> progress, CancellationToken cancellationToken)
+        public async Task WriteToDbAsync(string rootPath,
+                                         string lastTime,
+                                         Channel<(string filePath, DateTime lastWriteTime, long fileSize)> filesChannel,
+                                         IProgress<int> progress,
+                                         CancellationToken cancellationToken)
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-            await context.Set<TempScannedFile>().ExecuteDeleteAsync();
+            await context.Set<TempScannedFile>().ExecuteDeleteAsync(cancellationToken);
 
             int totalProcessed = 0;
-            List<string> batch = new List<string>(5000);
+            List<(string filePath, DateTime lastWriteTime, long fileSize)> batch = new List<(string filePath, DateTime lastWriteTime, long fileSize)>(5000);
             var lastUiUpdateTime = DateTime.Now;
-
-            using var transaction = await context.Database.BeginTransactionAsync();
+            var lastScanTime = string.IsNullOrEmpty(lastTime) ? DateTime.MinValue : DateTime.Parse(lastTime);
 
             try
             {
                 await foreach (var filePath in filesChannel.Reader.ReadAllAsync(cancellationToken))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     batch.Add(filePath);
 
                     if (batch.Count == 5000)
                     {
-                        await InsertDataIntoTemporaryTable(batch, context);
                         totalProcessed += batch.Count;
+                        await InsertDataIntoTemporaryTable(batch, context, lastScanTime, cancellationToken);
 
                         if ((DateTime.Now - lastUiUpdateTime).TotalMilliseconds >= 500)
                         {
-                            ReportProgressToUi(progress, totalProcessed);
+                            progress.Report(totalProcessed);
                             lastUiUpdateTime = DateTime.Now;
                         }
                     }
@@ -121,165 +132,67 @@ namespace Tagger.services.implementations
 
                 if (batch.Count > 0)
                 {
-                    await InsertDataIntoTemporaryTable(batch, context);
+                    await InsertDataIntoTemporaryTable(batch, context, lastScanTime, cancellationToken);
                     totalProcessed += batch.Count;
                 }
 
-                await transaction.CommitAsync();
-                ReportProgressToUi(progress, totalProcessed);
+                progress.Report(totalProcessed);
 
                 await context.Files
                     .Where(f => f.Path.StartsWith(rootPath) && !context.Set<TempScannedFile>().Any(t => t.Path == f.Path))
-                    .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true));
+                    .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true), cancellationToken);
 
-                progress.Report([]);
+                await context.Files
+                    .Where(f => f.Path.StartsWith(rootPath) && f.IsDeleted && context.Set<TempScannedFile>().Any(t => t.Path == f.Path))
+                    .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, false), cancellationToken);
+
+                progress.Report(totalProcessed);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception)
             {
-                await transaction.RollbackAsync();
                 throw;
             }
         }
 
-        private async Task InsertDataIntoTemporaryTable(List<string> batch, ApplicationDbContext context)
+        private async Task InsertDataIntoTemporaryTable(List<(string filePath, DateTime lastWriteTime, long fileSize)> batch,
+                                                        ApplicationDbContext context,
+                                                        DateTime lastTime,
+                                                        CancellationToken token)
         {
             var fileRecords = new List<FileRecord>(batch.Count);
             var tempRecords = new List<TempScannedFile>(batch.Count);
 
-            foreach (var path in batch)
+            foreach (var file in batch)
             {
+                tempRecords.Add(new TempScannedFile { Path = file.filePath });
+
                 fileRecords.Add(new FileRecord
                 {
-                    Name = Path.GetFileName(path),
-                    Path = path,
-                    Size = 0,
-                    LastModified = DateTime.Now,
+                    Name = Path.GetFileName(file.filePath),
+                    Path = file.filePath,
+                    Size = file.fileSize,
+                    LastModified = file.lastWriteTime,
                     IsDeleted = false
                 });
-
-                tempRecords.Add(new TempScannedFile { Path = path });
             }
 
-            await context.BulkInsertAsync(fileRecords);
-            await context.BulkInsertAsync(tempRecords);
+            await context.BulkInsertAsync(tempRecords, cancellationToken: token);
+
+            if (fileRecords.Count > 0)
+            {
+                var bulkConfig = new BulkConfig
+                {
+                    UpdateByProperties = new List<string> { nameof(FileRecord.Path) }
+                };
+                await context.BulkInsertOrUpdateAsync(fileRecords, bulkConfig, cancellationToken: token);
+            }
 
             context.ChangeTracker.Clear();
             batch.Clear();
         }
-
-        private void ReportProgressToUi(IProgress<List<FileRecord>> progress, int totalProcessed)
-        {
-            if (progress == null) return;
-
-            var progressInfo = new FileRecord
-            {
-                Name = $"Сканирование... Найдено: {totalProcessed}",
-                Size = totalProcessed
-            };
-
-            progress.Report([progressInfo]);
-        }
-
-        //public async Task ScanDirectoryAsync(string path, IProgress<List<FileRecord>> progress, CancellationToken cancellationToken)
-        //{
-        //    await Task.Run(async () =>
-        //    {
-        //        using var context = await _contextFactory.CreateDbContextAsync();
-        //        context.ChangeTracker.AutoDetectChangesEnabled = false;
-
-        //        try
-        //        {
-        //            int totalFilesCount = 0;
-        //            const int DbBatchSize = 2000;
-        //            const int UiBatchSize = 2000;
-
-        //            var dbBatchList = new List<FileRecord>();
-        //            var uiBatchList = new List<FileRecord>();
-        //            var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        //            var existingPath = new HashSet<string>(
-        //                await context.Files
-        //                    .Where(f => f.Path.StartsWith(path))
-        //                    .Select(f => f.Path)
-        //                    .ToListAsync(cancellationToken),
-        //                StringComparer.OrdinalIgnoreCase);
-
-        //            var rootDir = new DirectoryInfo(path);
-        //            var enumerationOptions = new EnumerationOptions
-        //            {
-        //                IgnoreInaccessible = true,
-        //                RecurseSubdirectories = true,
-        //                AttributesToSkip = FileAttributes.System | FileAttributes.Hidden
-        //            };
-
-        //            foreach (var file in rootDir.EnumerateFiles("*", enumerationOptions))
-        //            {
-        //                cancellationToken.ThrowIfCancellationRequested();
-        //                scannedPaths.Add(file.FullName);
-
-        //                if (existingPath.Contains(file.FullName)) continue;
-
-        //                var record = new FileRecord
-        //                {
-        //                    Name = file.Name,
-        //                    Path = file.FullName,
-        //                    Size = file.Length,
-        //                    LastModified = file.LastWriteTime,
-        //                    IsDeleted = false
-        //                };
-
-        //                dbBatchList.Add(record);
-        //                uiBatchList.Add(record);
-        //                totalFilesCount++;
-
-        //                if (uiBatchList.Count >= UiBatchSize)
-        //                {
-        //                    progress.Report([.. uiBatchList]);
-        //                    uiBatchList.Clear();
-        //                }
-
-        //                if (dbBatchList.Count >= DbBatchSize)
-        //                {
-        //                    await context.Files.AddRangeAsync(dbBatchList, cancellationToken);
-        //                    await context.SaveChangesAsync(cancellationToken);
-
-        //                    foreach (var added in dbBatchList) existingPath.Add(added.Path);
-        //                    dbBatchList.Clear();
-        //                }
-        //            }
-
-        //            if (uiBatchList.Count > 0)
-        //            {
-        //                progress.Report([.. uiBatchList]);
-        //            }
-
-        //            if (dbBatchList.Count > 0)
-        //            {
-        //                await context.Files.AddRangeAsync(dbBatchList, cancellationToken);
-        //                await context.SaveChangesAsync(cancellationToken);
-        //            }
-
-        //            var dbFiles = await context.Files
-        //                .Where(f => f.Path.StartsWith(path))
-        //                .ToListAsync(cancellationToken);
-
-        //            var filesToRemove = dbFiles
-        //                .Where(f => !scannedPaths.Contains(f.Path))
-        //                .ToList();
-
-        //            if (filesToRemove.Any())
-        //            {
-        //                context.RemoveRange(filesToRemove);
-        //                await context.SaveChangesAsync(cancellationToken);
-        //            }
-
-        //            progress.Report([]);
-        //        }
-        //        finally
-        //        {
-        //            context.ChangeTracker.AutoDetectChangesEnabled = true;
-        //        }
-        //    }, cancellationToken);
-        //}
     }
 }

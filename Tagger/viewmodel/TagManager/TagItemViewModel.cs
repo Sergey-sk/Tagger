@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using Tagger.dto;
 using Tagger.model;
+using Tagger.viewmodel.FileViewModels;
 using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.viewmodel
@@ -64,6 +64,20 @@ namespace Tagger.viewmodel
             OnPropertyChanged(nameof(AssignmentPayload));
             OnPropertyChanged(nameof(IsAttachedToAllSelectedFiles));
             OnPropertyChanged(nameof(IsAttachedToAnySelectedFiles));
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if(obj is TagItemViewModel other)
+            {
+                return Id == other.Id;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
         }
     }
 }

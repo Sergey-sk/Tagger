@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Tagger.dto;
+using Tagger.viewmodel.FileViewModels;
 
 namespace Tagger.viewmodel.TagManagerViewModel
 {

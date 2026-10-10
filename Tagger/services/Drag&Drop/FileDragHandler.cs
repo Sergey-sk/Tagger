@@ -1,9 +1,9 @@
 ﻿using GongSolutions.Wpf.DragDrop;
 using System.Windows;
-using Tagger.dto;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.services.interfaces;
+using Tagger.viewmodel.FileViewModels;
 
 namespace Tagger.services
 {

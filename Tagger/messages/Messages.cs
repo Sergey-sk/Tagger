@@ -1,8 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.Messaging.Messages;
-using Tagger.dto;
 using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.viewmodel;
+using Tagger.viewmodel.FileViewModels;
 using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.messages
@@ -11,13 +11,13 @@ namespace Tagger.messages
 
     public record ScanStateChangedMessage(ScanStatus status, string folderPath);
 
-    public record FilesScannedBatchMessage(List<FileRecord> FilesBatch);
+    public record FilesScannedBatchMessage(int filesCount);
 
     public record SearchToSaveMessage(string search);
 
     public record ApplySavedSearchMessage(SavedSearch search);
 
-    public record ApplyTagToSearch(List<TagItemViewModel> tags);
+    public record ApplyTagToSearch(HashSet<int> tagIds);
 
     public record SelectedItemsChangedMessage(List<FileItemViewModel> selectedItems, int previousCount);
 
@@ -34,6 +34,8 @@ namespace Tagger.messages
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
 
     public record DetachTagMessage(int tagId, HashSet<int> detachedFiles);
+
+    public record SearchResultAvailableMessage(List<FileItemViewModel> foundFiles);
 
     public class AddTagMessage(string tagName) : AsyncRequestMessage<bool>()
     {

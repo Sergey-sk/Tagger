@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using EFCore.BulkExtensions;
+using Microsoft.EntityFrameworkCore;
 using Tagger.db;
 using Tagger.model;
 using Tagger.services.interfaces;
@@ -20,54 +21,35 @@ namespace Tagger.services.implementations
         /// <param name="tagIds"></param>
         /// <param name="fileIds"></param>
         /// <returns></returns>
-        public async Task<List<int>> LinkFilesToTagAsync(List<int> tagIds, List<int> fileIds)
+        public async Task<List<int>> LinkFilesToTagAsync(HashSet<int> tagIds, HashSet<int> fileIds)
         {
             if (tagIds == null || tagIds.Count == 0 || fileIds == null || fileIds.Count == 0) return [];
 
             using var context = await _contextFactory.CreateDbContextAsync();
 
+            var existingSet = await context.FileTags
+                .AsNoTracking()
+                .Where(ft => fileIds.Contains(ft.FileId) && tagIds.Contains(ft.TagId))
+                .Select(ft => ValueTuple.Create(ft.FileId, ft.TagId))
+                .ToHashSetAsync();
+
+            List<FileTag> fileTagsToInsert = [];
             var addedFileIds = new HashSet<int>();
-            var newFileTags = new List<FileTag>();
 
-            const int SearchBatchSize = 500;
-
-            foreach(var currentBatch in fileIds.Chunk(SearchBatchSize))
+            foreach (var fileId in fileIds)
             {
-                var existingSet = await context.FileTags
-                    .AsNoTracking()
-                    .Where(ft => currentBatch.Contains(ft.FileId) && tagIds.Contains(ft.TagId))
-                    .Select(ft => ValueTuple.Create(ft.TagId, ft.FileId))
-                    .ToHashSetAsync();
-
-                foreach(var fileId in currentBatch)
+                foreach (var tagId in tagIds)
                 {
-                    foreach(var tagId in tagIds)
+                    if (!existingSet.Contains(ValueTuple.Create(fileId, tagId)))
                     {
-                        if(!existingSet.Contains((tagId, fileId)))
-                        {
-                            newFileTags.Add(new FileTag { TagId = tagId, FileId = fileId });
-                            addedFileIds.Add(fileId);
-                        }
+                        fileTagsToInsert.Add(new FileTag { FileId = fileId, TagId = tagId });
 
-                        if(newFileTags.Count >= 2000)
-                        {
-                            context.FileTags.AddRange(newFileTags);
-                            await context.SaveChangesAsync();
-
-                            context.ChangeTracker.Clear();
-                            newFileTags.Clear();
-                        }
+                        addedFileIds.Add(fileId);
                     }
                 }
             }
 
-            if(newFileTags.Count > 0)
-            {
-                context.FileTags.AddRange(newFileTags);
-                await context.SaveChangesAsync();
-
-                context.ChangeTracker.Clear();
-            }
+            await context.BulkInsertOrUpdateAsync(fileTagsToInsert);
 
             return addedFileIds.ToList();
         }
@@ -78,61 +60,37 @@ namespace Tagger.services.implementations
         /// <param name="fileIds"></param>
         /// <param name="tagIds"></param>
         /// <returns></returns>
-        public async Task<(List<int> addedTagIds, List<int> addedFileIds)> LinkTagsToFileAsync(List<int> fileIds, List<int> tagIds)
+        public async Task<(List<int> addedTagIds, List<int> addedFileIds)> LinkTagsToFileAsync(HashSet<int> fileIds, HashSet<int> tagIds)
         {
             if (fileIds == null || fileIds.Count == 0 || tagIds == null || tagIds.Count == 0) return ([], []);
 
             using var context = await _contextFactory.CreateDbContextAsync();
 
-            var addedElementIds = new HashSet<(int, int)>();
-            var newFileTags = new List<FileTag>();
+            var existingSet = await context.FileTags
+                .AsNoTracking()
+                .Where(ft => fileIds.Contains(ft.FileId) && tagIds.Contains(ft.TagId))
+                .Select(ft => ValueTuple.Create(ft.FileId, ft.TagId))
+                .ToHashSetAsync();
 
-            const int SearchBatchSize = 500;
+            List<FileTag> fileTagsToInsert = [];
+            var uniqueAddedTags = new HashSet<int>();
+            var uniqueAddedFiles = new HashSet<int>();
 
-            foreach (int[] currentBatch in fileIds.Chunk(SearchBatchSize))
+            foreach(var fileId in fileIds)
             {
-                var existingSet = await context.FileTags
-                    .AsNoTracking()
-                    .Where(ft => currentBatch.Contains(ft.FileId) && tagIds.Contains(ft.TagId))
-                    .Select(ft => ValueTuple.Create(ft.FileId, ft.TagId))
-                    .ToHashSetAsync();
-
-                foreach (var fileId in currentBatch)
+                foreach(var tagId in tagIds)
                 {
-                    foreach (var tagId in tagIds)
+                    if (!existingSet.Contains(ValueTuple.Create(fileId, tagId)))
                     {
-                        if (!existingSet.Contains((fileId, tagId)))
-                        {
-                            newFileTags.Add(new FileTag { FileId = fileId, TagId = tagId });
-                            addedElementIds.Add((tagId, fileId));
-                        }
+                        fileTagsToInsert.Add(new FileTag { FileId = fileId, TagId = tagId});
 
-                        if (newFileTags.Count >= 2000)
-                        {
-                            context.FileTags.AddRange(newFileTags);
-                            await context.SaveChangesAsync();
-                            context.ChangeTracker.Clear();
-                            newFileTags.Clear();
-                        }
+                        uniqueAddedFiles.Add(fileId);
+                        uniqueAddedTags.Add(tagId);
                     }
                 }
             }
 
-            if (newFileTags.Count > 0)
-            {
-                context.FileTags.AddRange(newFileTags);
-                await context.SaveChangesAsync();
-                context.ChangeTracker.Clear();
-            }
-
-            var uniqueAddedTags = new HashSet<int>();
-            var uniqueAddedFiles = new HashSet<int>();
-
-            foreach (var addedElementId in addedElementIds)
-            {
-                uniqueAddedTags.Add(addedElementId.Item1);
-                uniqueAddedFiles.Add(addedElementId.Item2);
-            }
+            await context.BulkInsertOrUpdateAsync(fileTagsToInsert);
 
             return (uniqueAddedTags.ToList(), uniqueAddedFiles.ToList());
         }

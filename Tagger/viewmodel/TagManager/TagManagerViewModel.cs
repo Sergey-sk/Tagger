@@ -6,15 +6,15 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
-using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services;
 using Tagger.services.interfaces;
+using Tagger.viewmodel.FileViewModels;
 
 namespace Tagger.viewmodel.TagManagerViewModel
 {
-    public partial class TagManagerViewModel : ObservableObject
+    public partial class TagManagerViewModel : ViewModelBase, IFolderConsumer
     {
         private readonly IDialogService _dialogService;
         private readonly ITagService _tagService;
@@ -65,16 +65,9 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
             SelectedTags.CollectionChanged += (s, e) =>
             {
-                WeakReferenceMessenger.Default.Send(new ApplyTagToSearch(SelectedTags.ToList()));
+                WeakReferenceMessenger.Default.Send(new ApplyTagToSearch([.. SelectedTags.Select(t => t.Id)]));
                 OnPropertyChanged(nameof(CurrentFilterStr));
             };
-
-            WeakReferenceMessenger.Default.Register<FolderChangedMessage>(this, (r, message) =>
-            {
-                ResetSelectedTags();
-                _selectedFiles.Clear();
-                SearchText = string.Empty;
-            });
 
             WeakReferenceMessenger.Default.Register<SelectedItemsChangedMessage>(this, async (r, message) =>
                 await OnSelectedFilesChangedMessage(message));
@@ -247,15 +240,14 @@ namespace Tagger.viewmodel.TagManagerViewModel
             }
         }
 
-        //[RelayCommand(CanExecute = nameof(CanCreateTag))]
         [RelayCommand]
         private async Task<bool> CreateTagAsync(string tagName)
         {
-            if (string.IsNullOrWhiteSpace(SearchText)) return false;
+            //if (string.IsNullOrWhiteSpace(SearchText)) return false;
 
             try
             {
-                var newTag = await _tagService.CreateTagAsync(tagName);
+                var newTag = await Task.Run(() => _tagService.CreateTagAsync(tagName));
                 var viewModelTag = new TagItemViewModel(newTag, () => _selectedFiles.ToList());
 
                 Tags.Add(viewModelTag);
@@ -275,8 +267,6 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 return false;
             }
         }
-
-        private bool CanCreateTag() => !string.IsNullOrWhiteSpace(SearchText);
 
         [RelayCommand]
         private async Task RemoveTagAsync(int tagId)
@@ -332,7 +322,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
             {
                 var selectedFileIds = assignmentPayload.Files.Select(f => f.Id).ToList();
 
-                var newFileIds = await _fileTagService.LinkFilesToTagAsync(assignmentPayload.TagIds, selectedFileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync([.. assignmentPayload.TagIds], [.. selectedFileIds]);
 
                 UpdateUiTags(assignmentPayload.TagIds, newFileIds.Count);
 
@@ -384,7 +374,7 @@ namespace Tagger.viewmodel.TagManagerViewModel
 
                 var fileIds = await _fileIndexingService.AddFilesFromPathAsync(filePaths.ToList(), progress);
 
-                var newFileIds = await _fileTagService.LinkFilesToTagAsync(tagIds, fileIds);
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync([.. tagIds], [.. fileIds]);
 
                 UpdateUiTags(tagIds, newFileIds.Count);
 
@@ -398,6 +388,15 @@ namespace Tagger.viewmodel.TagManagerViewModel
                 _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(false, "Ошибка"));
             }
+        }
+
+        public ValueTask OnFolderChanged(string path)
+        {
+            ResetSelectedTags();
+            _selectedFiles.Clear();
+            SearchText = string.Empty;
+
+            return ValueTask.CompletedTask;
         }
     }
 }

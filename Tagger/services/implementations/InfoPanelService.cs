@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
+using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Tagger.db;
-using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services.interfaces;
@@ -27,7 +27,7 @@ namespace Tagger.services.implementations
                 .ExecuteDeleteAsync();
         }
 
-        public async Task<int> AttachTagToFilesAsync(string tagName, List<int> fileIdsToAttach)
+        public async Task<(int tagId, List<int> fileIds)> AttachTagToFilesAsync(string tagName, List<int> fileIdsToAttach)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
 
@@ -40,37 +40,44 @@ namespace Tagger.services.implementations
 
                 bool isSuccess = await requestMessage.Response;
                 if (!isSuccess)
-                    return -1;
+                    return (-1, [-1]);
 
                 tag = await context.Tags.FirstOrDefaultAsync(t => t.Name == tagName);
-                if (tag == null) return -1;
+                if (tag == null) return (-1, [-1]);
             }
 
             var fileIds = fileIdsToAttach.ToHashSet();
-            var existingFileTags = await context.FileTags
+
+            var existingFileIds = await context.FileTags
+                .AsNoTracking()
                 .Where(ft => ft.TagId == tag.Id && fileIds.Contains(ft.FileId))
-                .Select(ft => ValueTuple.Create(ft.TagId, ft.FileId))
+                .Select(ft => ft.FileId)
                 .ToHashSetAsync();
 
             List<FileTag> fileTags = [];
+            List<int> addedFileIds = [];
 
             foreach (var file in fileIdsToAttach)
             {
-                var newFileTag = ValueTuple.Create(tag.Id, file);
-                if (!existingFileTags.Contains(newFileTag))
-                    fileTags.Add(new FileTag { TagId = newFileTag.Item1, FileId = newFileTag.Item2 });
+                if (!existingFileIds.Contains(file))
+                {
+                    fileTags.Add(new FileTag { FileId = file, TagId = tag.Id });
+                    addedFileIds.Add(file);
+                }
             }
 
-            const int batchSize = 500;
-            for (int i = 0; i < fileTags.Count; i += batchSize)
-            {
-                var currentBatch = fileTags.Skip(i).Take(batchSize).ToList();
+            await context.BulkInsertAsync(fileTags);
 
-                await context.FileTags.AddRangeAsync(currentBatch);
-                await context.SaveChangesAsync();
-            }
+            //const int batchSize = 500;
+            //for (int i = 0; i < fileTags.Count; i += batchSize)
+            //{
+            //    var currentBatch = fileTags.Skip(i).Take(batchSize).ToList();
 
-            return tag.Id;
+            //    await context.FileTags.AddRangeAsync(currentBatch);
+            //    await context.SaveChangesAsync();
+            //}
+
+            return (tag.Id, addedFileIds);
         }
     }
 }

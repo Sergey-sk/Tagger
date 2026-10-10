@@ -6,5 +6,6 @@
         public string Name { get; set; } = string.Empty;
 
         public List<FileRecord> Files { get; set; } = new();
+        public int ActiveFilesCount => Files.Count(f => !f.IsDeleted);
     }
 }

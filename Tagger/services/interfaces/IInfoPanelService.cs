@@ -1,10 +1,8 @@
-﻿using Tagger.dto;
-
-namespace Tagger.services.interfaces
+﻿namespace Tagger.services.interfaces
 {
     public interface IInfoPanelService
     {
         Task DetachTagFromFilesAsync(int tagId, List<int> fileIds);
-        Task<int> AttachTagToFilesAsync(string tagName, List<int> fileIdsToAttach);
+        Task<(int tagId, List<int> fileIds)> AttachTagToFilesAsync(string tagName, List<int> fileIdsToAttach);
     }
 }

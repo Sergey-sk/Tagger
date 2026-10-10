@@ -4,10 +4,10 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using Tagger.dto;
 using Tagger.messages;
 using Tagger.services.Drag_Drop;
 using Tagger.viewmodel;
+using Tagger.viewmodel.FileViewModels;
 using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.services

@@ -10,13 +10,7 @@
              xmlns:dd="urn:gong-wpf-dragdrop"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-
-    <i:Interaction.Triggers>
-        <i:EventTrigger EventName="Loaded">
-            <i:InvokeCommandAction Command="{Binding FileViewer.LoadOnStartCommand}"/>
-        </i:EventTrigger>
-    </i:Interaction.Triggers>
-
+    
     <UserControl.Resources>
         <nmsp:SizeConverter x:Key="SizeConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
@@ -138,7 +132,7 @@
 
             <ListView x:Name="listView"
                       Grid.Row="1"
-                      ItemsSource="{Binding FileViewer.Files}"
+                      ItemsSource="{Binding FileViewer.Grid.Files}"
                       SelectionMode="Extended"
                       HorizontalAlignment="Stretch"
                       VirtualizingPanel.IsVirtualizing="True"
@@ -154,7 +148,7 @@
                       dd:DragDrop.DragAdornerTemplate="{StaticResource FileDragTemplate}">
 
                 <i:Interaction.Behaviors>
-                    <nmsp:MultiSelectionBehavior SelectedItems="{Binding FileViewer.SelectedFiles}"/>
+                    <nmsp:MultiSelectionBehavior SelectedItems="{Binding FileViewer.Grid.SelectedFiles}"/>
                 </i:Interaction.Behaviors>
 
                 <ListView.ItemContainerStyle>
@@ -172,11 +166,11 @@
                             <Setter.Value>
                                 <ContextMenu>
                                     <MenuItem Header="Открыть"
-                                              Command="{Binding PlacementTarget.Tag.OpenFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              Command="{Binding OpenFileCommand}"
                                               CommandParameter="{Binding}"/>
-                                    <MenuItem Header="Открепить все теги"
-                                              Command="{Binding PlacementTarget.FileViewer.DetachTagsFromFileCommand}"
-                                              CommandParameter="{Binding Id}"/>
+                                    <MenuItem Header="Открепить все теги"/>
+                                    <!--Command="{Binding PlacementTarget.Tag.DetachTagsFromFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}"-->
+                                              <!--CommandParameter="{Binding Id}"/>-->
                                 </ContextMenu>
                             </Setter.Value>
                         </Setter>

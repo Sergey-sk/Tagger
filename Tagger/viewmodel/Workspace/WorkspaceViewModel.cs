@@ -48,10 +48,6 @@ namespace Tagger.viewmodel.WorkspaceViewModel
                 ? folderPath
                 : "Не указана";
 
-            //CurrentPath = Directory.Exists(Properties.Settings.Default.FolderPath)
-            //    ? Properties.Settings.Default.FolderPath
-            //    : "Не указана";
-
             WeakReferenceMessenger.Default.Register<SearchToSaveMessage>(this, (r, message) =>
             {
                 _searchText = message.search;
@@ -60,7 +56,6 @@ namespace Tagger.viewmodel.WorkspaceViewModel
 
         private void LoadQuickAccess()
         {
-            //Properties.Settings.Default.RecentFoldersRaw
             string rawFolders = _appSettingsService.GetSetting("RecentFoldersRaw");
 
             if (!string.IsNullOrEmpty(rawFolders))
@@ -106,9 +101,6 @@ namespace Tagger.viewmodel.WorkspaceViewModel
             _appSettingsService.SetSetting("FolderPath", value);
             _appSettingsService.SetSetting("RecentFoldersRaw", string.Join(";", QuickAccess));
             _appSettingsService.SaveSettings();
-            //Properties.Settings.Default.FolderPath = value;
-            //Properties.Settings.Default.RecentFoldersRaw = string.Join(";", QuickAccess);
-            //Properties.Settings.Default.Save();
 
             WeakReferenceMessenger.Default.Send(new FolderChangedMessage(value));
         }

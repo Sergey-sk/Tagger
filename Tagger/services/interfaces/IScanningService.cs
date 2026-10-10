@@ -7,6 +7,6 @@ namespace Tagger.services.interfaces
 {
     public interface IScanningService
     {
-        Task ScanDirectoryAsync(string path, string lastSuccessScanTime,IProgress<List<FileRecord>> progress, CancellationToken cancellationToken);
+        Task ScanDirectoryAsync(string path, string lastSuccessScanTime,IProgress<int> progress, CancellationToken cancellationToken);
     }
 }

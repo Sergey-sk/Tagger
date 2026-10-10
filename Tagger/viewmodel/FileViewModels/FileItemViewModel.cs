@@ -1,10 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Windows;
 using Tagger.model;
-using Tagger.viewmodel;
 
-namespace Tagger.dto
+namespace Tagger.viewmodel.FileViewModels
 {
     public partial class FileItemViewModel : ObservableObject
     {
@@ -48,6 +49,16 @@ namespace Tagger.dto
 
             OnPropertyChanged(nameof(RemainingTagsCount));
             OnPropertyChanged(nameof(HasMoreTags));
+        }
+
+        [RelayCommand]
+        private async Task OpenFileAsync(FileItemViewModel file)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = file.Path,
+                UseShellExecute = true
+            });
         }
     }
 }

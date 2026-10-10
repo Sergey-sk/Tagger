@@ -10,8 +10,10 @@ using Tagger.services.implementations;
 using Tagger.services.interfaces;
 using Tagger.viewmodel;
 using Tagger.viewmodel.FileViewerViewModel;
+using Tagger.viewmodel.FileViewModels;
 using Tagger.viewmodel.InfoPanelViewModel;
 using Tagger.viewmodel.ScannerViewModel;
+using Tagger.viewmodel.Search;
 using Tagger.viewmodel.TagManagerViewModel;
 using Tagger.viewmodel.WorkspaceViewModel;
 
@@ -44,6 +46,10 @@ namespace Tagger
                     services.AddTransient<TagManagerViewModel>();
                     services.AddTransient<WorkspaceViewModel>();
 
+                    services.AddTransient<SearchViewModel>();
+                    services.AddTransient<FileGridViewModel>();
+                    services.AddTransient<FolderWorkspaceViewModel>();
+
                     services.AddSingleton<IDialogService, DialogService>();
                     services.AddSingleton<ITagService, TagService>();
                     services.AddSingleton<IFileIndexingService, FileIndexingService>();
@@ -52,6 +58,7 @@ namespace Tagger
                     services.AddSingleton<IFileService, FileService>();
                     services.AddSingleton<IFileTagService, FileTagService>();
                     services.AddSingleton<IInfoPanelService, InfoPanelService>();
+                    services.AddSingleton<ITagCacheService, TagCacheService>();
 
                     services.AddSingleton<MainWindow>();
                 })
@@ -68,7 +75,7 @@ namespace Tagger
 
                 using (var context = await contextFactory.CreateDbContextAsync())
                 {
-                    await context.Database.EnsureDeletedAsync();
+                    //await context.Database.EnsureDeletedAsync();
                     await context.Database.EnsureCreatedAsync();
                 }
 

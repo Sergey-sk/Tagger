@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RTools_NTS.Util;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -12,10 +13,9 @@ namespace Tagger.services.interfaces
         Task<List<FileRecord>> LoadFilesForPathInBackgroundAsync(string path, CancellationToken token);
         Task<List<FileRecord>> SearchWithDebounceAsync(
             string searchText,
-            List<FileRecord> files,
             string path,
-            List<int> tagIds,
-            CancellationTokenSource? searchCts);
+            HashSet<int> tagIds,
+            CancellationToken token);
         Task<List<Tag>> GetTagsByIds(List<int> tagIds);
 
         Task DetachTagFromFilesAsync(int tagId, List<int> selectedFileIds);

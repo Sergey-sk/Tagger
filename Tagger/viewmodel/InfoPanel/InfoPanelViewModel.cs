@@ -3,10 +3,10 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.ObjectModel;
 using System.Windows;
-using Tagger.dto;
 using Tagger.messages;
 using Tagger.model;
 using Tagger.services.interfaces;
+using Tagger.viewmodel.FileViewModels;
 using Tagger.viewmodel.TagManagerViewModel;
 
 namespace Tagger.viewmodel.InfoPanelViewModel
@@ -142,7 +142,7 @@ namespace Tagger.viewmodel.InfoPanelViewModel
         {
             if (string.IsNullOrWhiteSpace(SearchTagNameText)) return;
 
-            int tagId = await _infoPanelService.AttachTagToFilesAsync(SearchTagNameText, selectedFiles.Select(f => f.Id).ToList());
+            var (tagId, fileIds) = await _infoPanelService.AttachTagToFilesAsync(SearchTagNameText, selectedFiles.Select(f => f.Id).ToList());
 
             if (tagId == -1)
             {
@@ -150,8 +150,8 @@ namespace Tagger.viewmodel.InfoPanelViewModel
                 return;
             }
 
-            WeakReferenceMessenger.Default.Send(new ApplyFileMessage([tagId], selectedFiles.Select(f => f.Id).ToList()));
-            WeakReferenceMessenger.Default.Send(new ApplyTagMessage([tagId], selectedFiles.Select(f => f.Id).ToList()));
+            WeakReferenceMessenger.Default.Send(new ApplyFileMessage([tagId], fileIds));
+            WeakReferenceMessenger.Default.Send(new ApplyTagMessage([tagId], fileIds));
 
             SearchTagNameText = string.Empty;
         }

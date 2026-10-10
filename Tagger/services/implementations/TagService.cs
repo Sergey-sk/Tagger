@@ -25,22 +25,7 @@ namespace Tagger.services.implementations
                     .Include(t => t.Files)
                     .ToListAsync();
 
-            foreach (var tag in collection)
-            {
-                var validFiles = tag.Files
-                    .Where(f => File.Exists(f.Path))
-                    .ToList();
-
-                if (tag.Files.Count != validFiles.Count)
-                {
-                    tag.Files = validFiles;
-                    context.Tags.Update(tag);
-                }
-            }
-
-            await context.SaveChangesAsync();
-
-            return collection.OrderByDescending(t => t.Files.Count).ToList();
+            return [.. collection.OrderByDescending(t => t.ActiveFilesCount)];
         }
 
         public async Task<Tag> CreateTagAsync(string tagName)

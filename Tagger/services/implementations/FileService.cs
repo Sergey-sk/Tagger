@@ -21,7 +21,7 @@ namespace Tagger.services.implementations
             return await context.Files
                 .AsNoTracking()
                 .Include(f => f.Tags)
-                .Where(f => f.Path.StartsWith(path))
+                .Where(f => f.Path.StartsWith(path) && !f.IsDeleted)
                 .Take(3000)
                 .ToListAsync(token);
         }
@@ -39,29 +39,20 @@ namespace Tagger.services.implementations
 
         public async Task<List<FileRecord>> SearchWithDebounceAsync(
             string searchText,
-            List<FileRecord> files,
             string path,
-            List<int> tagIds,
-            CancellationTokenSource? searchCts)
+            HashSet<int> tagIds,
+            CancellationToken token)
         {
-            searchCts?.Cancel();
-            searchCts = new CancellationTokenSource();
-            var token = searchCts.Token;
+            using var context = await _contextFactory.CreateDbContextAsync();
 
-            if (!string.IsNullOrEmpty(searchText))
-                await Task.Delay(150, token);
-
-            if (files.Count == 0) return [];
-
-            IEnumerable<FileRecord> query = files
+            var query = context.Files
+                .AsNoTracking()
+                .Include(f => f.Tags)
                 .Where(f => f.Path.StartsWith(path));
 
             if (tagIds.Count > 0)
             {
-                foreach (var tagId in tagIds)
-                {
-                    query = query.Where(f => f.Tags.Any(t => t.Id == tagId));
-                }
+                query = query.Where(f => f.Tags.Any(t => tagIds.Contains(t.Id)));
             }
 
             if (!string.IsNullOrWhiteSpace(searchText))
@@ -70,13 +61,14 @@ namespace Tagger.services.implementations
 
                 foreach (var keyword in keywords)
                 {
-                    query = query.Where(f => f.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                    string pattern = $"%{keyword}%";
+                    query = query.Where(f => EF.Functions.Like(f.Name, pattern));
                 }
             }
 
             token.ThrowIfCancellationRequested();
 
-            var result = query.Take(3000).ToList();
+            var result = await query.Take(3000).ToListAsync(token);
 
             token.ThrowIfCancellationRequested();
 

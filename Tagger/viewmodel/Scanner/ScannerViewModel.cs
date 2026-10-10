@@ -10,7 +10,7 @@ using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.ScannerViewModel
 {
-    public partial class ScannerViewModel : ObservableObject, IRecipient<FolderChangedMessage>
+    public partial class ScannerViewModel : ViewModelBase, IFolderConsumer
     {
         private readonly IDialogService _dialogService;
         private readonly IScanningService _scanningService;
@@ -32,8 +32,6 @@ namespace Tagger.viewmodel.ScannerViewModel
             _dialogService = dialogService;
             _scanningService = scanningService;
             _appSettingsService = appSettingsService;
-
-            WeakReferenceMessenger.Default.Register(this);
 
             WeakReferenceMessenger.Default.Register<ChangeProgressStatus>(this, (r, message) =>
             {
@@ -61,15 +59,13 @@ namespace Tagger.viewmodel.ScannerViewModel
             _changeStatus = true;
             _isCancelingByFolderChange = false;
             ProgressStatus = "Начало сканирования";
-            int totalScannedCount = 0;
 
-            var progress = new Progress<List<FileRecord>>(files =>
+            var progress = new Progress<int>(filesCount =>
             {
-                if (files.Count > 0)
+                if (filesCount > 0)
                 {
-                    totalScannedCount += (int)files[0].Size;
-                    if (_changeStatus) ProgressStatus = $"Найдено файлов: {totalScannedCount:N0}";
-                    WeakReferenceMessenger.Default.Send(new FilesScannedBatchMessage(files));
+                    if (_changeStatus) ProgressStatus = $"Найдено файлов: {filesCount:N0}";
+                    WeakReferenceMessenger.Default.Send(new FilesScannedBatchMessage(filesCount));
                 }
             });
 
@@ -119,9 +115,9 @@ namespace Tagger.viewmodel.ScannerViewModel
             _currentActivePath != "Не выбрана" &&
             _currentActivePath != "Не указана";
 
-        public void Receive(FolderChangedMessage message)
+        public ValueTask OnFolderChanged(string path)
         {
-            _currentActivePath = message.newPath;
+            _currentActivePath = path;
 
             if (StartScanCommand.IsRunning)
             {
@@ -130,6 +126,8 @@ namespace Tagger.viewmodel.ScannerViewModel
             }
 
             StartScanCommand.NotifyCanExecuteChanged();
+
+            return ValueTask.CompletedTask;
         }
     }
 }
