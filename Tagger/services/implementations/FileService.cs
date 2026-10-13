@@ -93,5 +93,14 @@ namespace Tagger.services.implementations
                 .Where(ft => selectedFileIds.Contains(ft.FileId) && tagId == ft.TagId)
                 .ExecuteDeleteAsync();
         }
+
+        public async Task DetachAllTagsFromFilesAsync(int fileId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+
+            await context.FileTags
+                .Where(ft => ft.FileId == fileId)
+                .ExecuteDeleteAsync();
+        }
     }
 }

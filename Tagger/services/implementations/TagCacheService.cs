@@ -30,5 +30,11 @@ namespace Tagger.services.implementations
         }
 
         public void Remove(int tagId) => _cachedUiTags.Remove(tagId);
+
+        public async Task<Dictionary<int, TagItemViewModel>> Update()
+        {
+            _cachedUiTags.Clear();
+            return await GetOrCreateCacheAsync();
+        }
     }
 }

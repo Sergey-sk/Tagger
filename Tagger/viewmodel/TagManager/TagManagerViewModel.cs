@@ -7,7 +7,6 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
 using Tagger.messages;
-using Tagger.model;
 using Tagger.services;
 using Tagger.services.interfaces;
 using Tagger.viewmodel.FileViewModels;
@@ -117,6 +116,26 @@ namespace Tagger.viewmodel.TagManagerViewModel
             {
                 var filteredTags = GetFilteredTags(message.Filter);
                 message.Reply(filteredTags);
+            });
+
+            WeakReferenceMessenger.Default.Register<DetachAllTagMessage>(this, (r, m) =>
+            {
+                using (TagsView?.DeferRefresh())
+                {
+                    foreach (var tag in Tags)
+                    {
+                        if (m.file.Tags.Any(t => t.Id == tag.Id))
+                        {
+                            tag.DecrementFilesCount();
+
+                            if (SharedTagsForSelection.Any(t => t.Id == tag.Id))
+                                SharedTagsForSelection.Remove(tag);
+                        }
+
+                    }
+                }
+
+                TagsView?.Refresh();
             });
         }
 

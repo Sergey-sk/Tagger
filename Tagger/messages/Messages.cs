@@ -35,6 +35,8 @@ namespace Tagger.messages
 
     public record DetachTagMessage(int tagId, HashSet<int> detachedFiles);
 
+    public record DetachAllTagMessage(FileItemViewModel file);
+
     public record SearchResultAvailableMessage(List<FileItemViewModel> foundFiles);
 
     public class AddTagMessage(string tagName) : AsyncRequestMessage<bool>()
@@ -48,6 +50,8 @@ namespace Tagger.messages
     {
         public string Filter { get; } = filter;
     }
+
+    public class RequestCurrentSearchQueryMessage : RequestMessage<bool> { }
 
     public enum ScanStatus
     {

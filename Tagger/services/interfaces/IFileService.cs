@@ -19,5 +19,7 @@ namespace Tagger.services.interfaces
         Task<List<Tag>> GetTagsByIds(List<int> tagIds);
 
         Task DetachTagFromFilesAsync(int tagId, List<int> selectedFileIds);
+
+        Task DetachAllTagsFromFilesAsync(int fileId);
     }
 }

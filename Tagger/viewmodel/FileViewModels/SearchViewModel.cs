@@ -8,7 +8,7 @@ using Tagger.viewmodel.FileViewModels;
 
 namespace Tagger.viewmodel.Search
 {
-    public partial class SearchViewModel : ObservableObject, IFolderConsumer
+    public partial class SearchViewModel : ViewModelBase, IFolderConsumer
     {
         private readonly IFileService _fileService;
         private readonly AppSettingsService _appSettingsService;
@@ -49,6 +49,19 @@ namespace Tagger.viewmodel.Search
             WeakReferenceMessenger.Default.Register<ApplySavedSearchMessage>(this, (r, m) =>
             {
                 CurrentSearchText = m.search?.QueryText ?? string.Empty;
+            });
+
+            WeakReferenceMessenger.Default.Register<RequestCurrentSearchQueryMessage>(this, async (r,m) =>
+            {
+                if (IsSearching)
+                {
+                    m.Reply(true);
+                    await TriggerSearchWithDebounceAsync();
+                }
+                else
+                {
+                    m.Reply(false);
+                }
             });
         }
 

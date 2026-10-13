@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -12,6 +13,7 @@ namespace Tagger.viewmodel.FileViewModels
     {
         private readonly IFileService _fileService;
         private readonly ITagCacheService _tagCacheService;
+        private readonly IDialogService _dialogService;
 
         private Dictionary<int, TagItemViewModel> _globalUiTags = [];
 
@@ -21,10 +23,11 @@ namespace Tagger.viewmodel.FileViewModels
         public ObservableCollection<FileItemViewModel> SelectedFiles { get; set; } = [];
         public long SelectedFilesSize => SelectedFiles.Sum(f => f.Size);
 
-        public FileGridViewModel(IFileService fileService, ITagCacheService tagCacheService)
+        public FileGridViewModel(IFileService fileService, ITagCacheService tagCacheService, IDialogService dialogService)
         {
             _fileService = fileService;
             _tagCacheService = tagCacheService;
+            _dialogService = dialogService;
 
             SelectedFiles.CollectionChanged += OnSelectedFilesCollectionChanged;
 
@@ -69,6 +72,11 @@ namespace Tagger.viewmodel.FileViewModels
         {
             _globalUiTags = await _tagCacheService.GetOrCreateCacheAsync();
 
+            if (!_globalUiTags.ContainsKey(message.tagIds.FirstOrDefault()))
+            {
+                _globalUiTags = await _tagCacheService.Update();
+            }
+
             var savedTags = await _fileService.GetTagsByIds(message.tagIds);
             if (savedTags == null || savedTags.Count == 0) return;
 
@@ -88,6 +96,8 @@ namespace Tagger.viewmodel.FileViewModels
                         uiFile.Tags.Add(uiTag);
                 }
             }
+
+            WeakReferenceMessenger.Default.Send(new ApplyTagToSearch([]));
         }
 
         private async Task OnRemoveTag(RemoveTagMessage message)
@@ -125,6 +135,25 @@ namespace Tagger.viewmodel.FileViewModels
                         uiFile.Tags.Add(uiTag);
                 }
             }
+        }
+
+        [RelayCommand]
+        public void DetachTagsFromFile(FileItemViewModel file)
+        {
+            var result = _dialogService.ShowMessage("Открепить все теги от этого файла?",
+                                       "Открепление тегов",
+                                       System.Windows.MessageBoxButton.YesNo,
+                                       System.Windows.MessageBoxImage.Question);
+
+            if(result == System.Windows.MessageBoxResult.No) return;
+
+            _fileService.DetachAllTagsFromFilesAsync(file.Id);
+
+            WeakReferenceMessenger.Default.Send(new DetachAllTagMessage(file));
+
+            var uiFile = Files.FirstOrDefault(f => f.Id == file.Id);
+            if (uiFile != null)
+                uiFile.Tags.Clear();
         }
     }
 }

@@ -166,11 +166,10 @@
                             <Setter.Value>
                                 <ContextMenu>
                                     <MenuItem Header="Открыть"
-                                              Command="{Binding OpenFileCommand}"
+                                              Command="{Binding OpenFileCommand}"/>
+                                    <MenuItem Header="Открепить все теги"
+                                              Command="{Binding PlacementTarget.Tag.Grid.DetachTagsFromFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               CommandParameter="{Binding}"/>
-                                    <MenuItem Header="Открепить все теги"/>
-                                    <!--Command="{Binding PlacementTarget.Tag.DetachTagsFromFileCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}"-->
-                                              <!--CommandParameter="{Binding Id}"/>-->
                                 </ContextMenu>
                             </Setter.Value>
                         </Setter>
@@ -187,9 +186,7 @@
 
                                             <i:Interaction.Behaviors>
                                                 <services:MouseDoubleClickCommandBehavior
-                                                    Command="{Binding Tag.OpenFileCommand,
-                                                        RelativeSource={RelativeSource AncestorType=ListViewItem}}"
-                                                    CommandParameter="{Binding}" />
+                                                    Command="{Binding OpenFileCommand}" />
                                             </i:Interaction.Behaviors>
 
                                             <GridViewRowPresenter 

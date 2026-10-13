@@ -127,7 +127,7 @@
                          Padding="30,0,0,0">
                          <!--Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource WidthConverter}, ConverterParameter=0.39}"-->
                     <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding FileViewer.TriggerSearchWithDebounceCommand}"/>
+                        <KeyBinding Key="Enter" Command="{Binding FileViewer.SearchBox.TriggerSearchWithDebounceCommand}"/>
                     </TextBox.InputBindings>
                 </TextBox>
 

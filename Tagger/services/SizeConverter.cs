@@ -18,10 +18,10 @@ namespace Tagger.viewmodel
                 if (kb < 1024) return $"{kb} КБ";
 
                 var mb = kb / 1024;
-                if (mb < 1024) return $"{mb} КБ";
+                if (mb < 1024) return $"{mb} МБ";
 
                 var gb = mb / 1024;
-                if (gb < 1024) return $"{gb} КБ";
+                if (gb < 1024) return $"{gb} ГБ";
             }
             return "0 Б";
         }

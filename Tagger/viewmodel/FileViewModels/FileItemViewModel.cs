@@ -52,11 +52,11 @@ namespace Tagger.viewmodel.FileViewModels
         }
 
         [RelayCommand]
-        private async Task OpenFileAsync(FileItemViewModel file)
+        private async Task OpenFileAsync()
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = file.Path,
+                FileName = this.Path,
                 UseShellExecute = true
             });
         }

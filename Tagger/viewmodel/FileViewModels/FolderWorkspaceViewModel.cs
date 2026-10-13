@@ -7,7 +7,7 @@ using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.FileViewModels
 {
-    public partial class FolderWorkspaceViewModel : ObservableObject, IFolderConsumer
+    public partial class FolderWorkspaceViewModel : ViewModelBase, IFolderConsumer
     {
         private readonly IFileService _fileService;
         private readonly IDialogService _dialogService;
@@ -98,6 +98,7 @@ namespace Tagger.viewmodel.FileViewModels
             _currentActivePath = path;
             await RefreshFolderAsync(path);
         }
+
         private async Task OnScanStateChanged(ScanStateChangedMessage message)
         {
             try
@@ -110,14 +111,17 @@ namespace Tagger.viewmodel.FileViewModels
                         IsLoading = true;
                         break;
 
+                    case ScanStatus.Finished:
                     case ScanStatus.CanceledByUser:
                         IsLoading = false;
-                        break;
 
-                    case ScanStatus.Finished:
-                        IsLoading = false;
+                        var searchReq = new RequestCurrentSearchQueryMessage();
+                        WeakReferenceMessenger.Default.Send(searchReq);
 
-                        await RefreshFolderAsync(message.folderPath);
+                        bool isSearchActive = searchReq.HasReceivedResponse && searchReq.Response;
+
+                        if (!isSearchActive)
+                            await RefreshFolderAsync(message.folderPath);
                         break;
 
                     default:

@@ -104,11 +104,11 @@
 
                             <TextBlock Grid.Column="0"
                                Grid.Row="0"
-                               Text="{Binding FileViewer.SelectedFiles.Count, StringFormat='Выбрано файлов: {0}'}"/>
+                               Text="{Binding FileViewer.Grid.SelectedFiles.Count, StringFormat='Выбрано файлов: {0}'}"/>
 
                             <TextBlock Grid.Column="0"
                                Grid.Row="1"
-                               Text="{Binding FileViewer.SelectedFilesSize, Converter={StaticResource SizeConverter}, StringFormat='Размер выбранных файлов: {0}'}"/>
+                               Text="{Binding FileViewer.Grid.SelectedFilesSize, Converter={StaticResource SizeConverter}, StringFormat='Размер выбранных файлов: {0}'}"/>
 
                             <Button Grid.Column="1"
                             Grid.Row="0"
@@ -259,7 +259,7 @@
                                 Margin="5,0,5,0"
                                 ToolTip="Добавить тег ко всем выбранным файлам"
                                 Command="{Binding InfoPanel.AttachTagToFilesCommand}"
-                                CommandParameter="{Binding FileViewer.SelectedFiles}"/>
+                                CommandParameter="{Binding FileViewer.Grid.SelectedFiles}"/>
                     </Grid>
                 </StackPanel>
             </Grid>
