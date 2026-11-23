@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Tagger.services.interfaces;
+﻿using Tagger.services.interfaces;
 using Tagger.viewmodel;
 
 namespace Tagger.services.implementations
@@ -10,6 +7,7 @@ namespace Tagger.services.implementations
     {
         private readonly ITagService _tagService;
         private Dictionary<int, TagItemViewModel> _cachedUiTags = [];
+        private List<TagItemViewModel> _tagsForSelection = [];
 
         public TagCacheService(ITagService tagService) => _tagService = tagService;
 
@@ -31,10 +29,28 @@ namespace Tagger.services.implementations
 
         public void Remove(int tagId) => _cachedUiTags.Remove(tagId);
 
-        public async Task<Dictionary<int, TagItemViewModel>> Update()
+        public async Task<Dictionary<int, TagItemViewModel>> UpdateAsync()
         {
             _cachedUiTags.Clear();
             return await GetOrCreateCacheAsync();
         }
+
+        public List<TagItemViewModel> GetTagsForSelection()
+        {
+            return _tagsForSelection;
+        }
+
+        public void AddTagForSelection(TagItemViewModel tag)
+        {
+            if (_tagsForSelection.Any(t => t.Id == tag.Id)) return;
+            _tagsForSelection.Add(tag);
+        }
+
+        public void RemoveTagForSelection(int id)
+        {
+            _tagsForSelection.RemoveAll(t => t.Id == id);
+        }
+
+        public void RemoveAllTagForSelection() => _tagsForSelection.Clear();
     }
 }

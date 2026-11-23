@@ -13,7 +13,7 @@
 
     <i:Interaction.Triggers>
         <i:EventTrigger EventName="Loaded">
-            <i:InvokeCommandAction Command="{Binding TagManager.LoadTagsCommand}"/>
+            <i:InvokeCommandAction Command="{Binding TagManager.TagList.LoadTagsCommand}"/>
             <i:InvokeCommandAction Command="{Binding Workspace.LoadSearchForPathCommand}"/>
         </i:EventTrigger>
     </i:Interaction.Triggers>
@@ -73,7 +73,7 @@
 
                 <Grid Grid.Row="0" Grid.Column="1" Margin="0,0,10,0">
                     <TextBox x:Name="SearhTextBox"
-                         Text="{Binding TagManager.SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding TagManager.TagList.SearchText, UpdateSourceTrigger=PropertyChanged}"
                          FontSize="14"
                          VerticalAlignment="Center"
                          VerticalContentAlignment="Center"
@@ -109,7 +109,7 @@
                         Width="32"
                         Height="{Binding ActualHeight, ElementName=SearhTextBox}"
                         Margin="0,0,5,0"
-                        Command="{Binding TagManager.CreateTagCommand}"
+                        Command="{Binding TagManager.TagCrudActions.CreateTagCommand}"
                         CommandParameter="{Binding Text, ElementName=SearhTextBox}"
                         ToolTip="Создать новый тег из строки поиска">
                     <Button.Template>
@@ -157,7 +157,7 @@
 
                 <ListBox x:Name="tagList"
                          Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,5"
-                         ItemsSource="{Binding TagManager.TagsView}"
+                         ItemsSource="{Binding TagManager.TagList.TagsView}"
                          Tag="{Binding DataContext, RelativeSource={RelativeSource Self}}"
                          SelectionMode="Extended"
                          Background="Transparent"
@@ -175,7 +175,7 @@
                          dd:DragDrop.DragAdornerTemplate="{StaticResource TagDragTemplate}">
 
                     <i:Interaction.Behaviors>
-                        <nmsp:MultiSelectionBehavior SelectedItems="{Binding TagManager.SelectedTags}"/>
+                        <nmsp:MultiSelectionBehavior SelectedItems="{Binding TagManager.TagSelectionFilter.SelectedTags}"/>
                     </i:Interaction.Behaviors>
 
                     <ListBox.ItemsPanel>
@@ -206,10 +206,10 @@
                                 <Setter.Value>
                                     <ContextMenu>
                                         <MenuItem Header="Применить к выделенным файлам"
-                                                  Command="{Binding PlacementTarget.Tag.ApplyTagToFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Command="{Binding PlacementTarget.Tag.TagList.ApplyTagToFilesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding Path=AssignmentPayload}"/>
                                         <MenuItem Header="Удалить"
-                                                  Command="{Binding PlacementTarget.Tag.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Command="{Binding PlacementTarget.Tag.TagCrudActions.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding Path=Id}"/>
                                     </ContextMenu>
                                 </Setter.Value>

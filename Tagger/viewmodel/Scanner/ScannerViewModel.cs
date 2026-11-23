@@ -1,10 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using Tagger.messages;
-using Tagger.model;
 using Tagger.services.implementations;
 using Tagger.services.interfaces;
 
@@ -19,6 +19,7 @@ namespace Tagger.viewmodel.ScannerViewModel
         private bool _isCancelingByFolderChange;
         private bool _changeStatus;
         private string _lastSuccessScaningTime;
+        private CancellationTokenSource _backgroundScanToken;
 
         [ObservableProperty]
         private string _progressStatus = "Готов к сканированию";
@@ -33,6 +34,14 @@ namespace Tagger.viewmodel.ScannerViewModel
             _scanningService = scanningService;
             _appSettingsService = appSettingsService;
 
+            RegisterMessages();
+
+            _currentActivePath = _appSettingsService.GetSetting("FolderPath");
+            _lastSuccessScaningTime = _appSettingsService.GetSetting("LastSuccessScanTime");
+        }
+
+        private void RegisterMessages()
+        {
             WeakReferenceMessenger.Default.Register<ChangeProgressStatus>(this, (r, message) =>
             {
                 IsScaning = message.isLoading;
@@ -40,13 +49,18 @@ namespace Tagger.viewmodel.ScannerViewModel
                 _changeStatus = false;
             });
 
-            _currentActivePath = _appSettingsService.GetSetting("FolderPath");
-            _lastSuccessScaningTime = _appSettingsService.GetSetting("LastSuccessScanTime");
+            WeakReferenceMessenger.Default.Register<StartBackroundScan>(this, async (r, m) =>
+                await BackgroundScanAsync());
+
+            WeakReferenceMessenger.Default.Register<ApplyChangesFiles>(this, async (r, m) =>
+                await ApplyChanges());
         }
 
         [RelayCommand(CanExecute = nameof(ScanCanExecute), IncludeCancelCommand = true)]
         private async Task StartScanAsync(CancellationToken token)
         {
+            var sw = Stopwatch.StartNew();
+
             if (string.IsNullOrEmpty(_currentActivePath)) return;
 
             if (!Directory.Exists(_currentActivePath))
@@ -55,6 +69,7 @@ namespace Tagger.viewmodel.ScannerViewModel
                 return;
             }
 
+            _backgroundScanToken?.Cancel();
             IsScaning = true;
             _changeStatus = true;
             _isCancelingByFolderChange = false;
@@ -104,8 +119,66 @@ namespace Tagger.viewmodel.ScannerViewModel
             finally
             {
                 IsScaning = false;
+
+                sw.Stop();
+                Debug.WriteLine($"Прошло: {sw.Elapsed.TotalMilliseconds} мс");
+                Debug.WriteLine($"Прошло: {sw.Elapsed}");
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(ScanCanExecute))]
+        private async Task BackgroundScanAsync()
+        {
+            _backgroundScanToken?.Cancel();
+            _backgroundScanToken = new CancellationTokenSource();
+            var token = _backgroundScanToken.Token;
+
+            var rootPath = Environment.GetEnvironmentVariable("SystemDrive") + "\\";
+
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    await _scanningService.ScanDirectoryAsync(rootPath, _lastSuccessScaningTime, null, token, true);
+                }, token);
+
+                _lastSuccessScaningTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                _appSettingsService.SetSetting("LastSuccessScanTime", _lastSuccessScaningTime);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                ProgressStatus = $"Ошибка: {ex.Message}";
             }
 
+        }
+
+        private async Task ApplyChanges()
+        {
+            ProgressStatus = "Применение изменений...";
+            IsScaning = true;
+
+            var rootPath = Environment.GetEnvironmentVariable("SystemDrive") + "\\";
+
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    await _scanningService.ApplyBackgroundScanChangesAsync(rootPath, CancellationToken.None);
+                });
+
+                WeakReferenceMessenger.Default.Send(new ReloadFilesMessage());
+
+                ProgressStatus = "Изменения успешно применены!";
+            }
+            catch (Exception ex)
+            {
+                ProgressStatus = $"Ошибка при применении изменений: {ex.Message}";
+            }
+            finally
+            {
+                IsScaning = false;
+            }
         }
 
         private bool ScanCanExecute() =>

@@ -13,6 +13,7 @@ namespace Tagger.viewmodel
         public FileViewerViewModel.FileViewerViewModel FileViewer { get; }
         public TagManagerViewModel.TagManagerViewModel TagManager { get; }
         public InfoPanelViewModel.InfoPanelViewModel InfoPanel { get; }
+        public InfoBar.InfoBarViewModel InfoBar { get; }
 
 
         [ObservableProperty]
@@ -23,6 +24,7 @@ namespace Tagger.viewmodel
                              ScannerViewModel.ScannerViewModel scanner,
                              TagManagerViewModel.TagManagerViewModel tagManager,
                              InfoPanelViewModel.InfoPanelViewModel infoPanel,
+                             InfoBar.InfoBarViewModel infoBar,
                              AppSettingsService appSettingsService)
         {
             _appSettingsService = appSettingsService;
@@ -33,6 +35,7 @@ namespace Tagger.viewmodel
             Scanner = scanner;
             TagManager = tagManager;
             InfoPanel = infoPanel;
+            InfoBar = infoBar;
 
             CurrentTheme = _appSettingsService.GetSetting("Theme", "System");
         }

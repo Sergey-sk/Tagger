@@ -18,4 +18,12 @@
     <!--Right Tag Panel-->
     <SolidColorBrush x:Key="RightTagPanelBackgroundBrush" Color="#B3F3F4F6"/>
     <SolidColorBrush x:Key="RightTagPanelBorderBrush" Color="#26000000"/>
+
+    <!--InfoBar-->
+    <SolidColorBrush x:Key="InfoBarBackgroundBrush" Color="#F3F3F3"/>
+    <SolidColorBrush x:Key="InfoBarBorderBrush" Color="#E5E5E5"/>
+    <SolidColorBrush x:Key="InfoBarIconBrush" Color="#0066B3"/>
+    <SolidColorBrush x:Key="InfoBarTextBrush" Color="#242424"/>
+    <SolidColorBrush x:Key="InfoBarCloseBrush" Color="#5F5F5F"/>
+    <SolidColorBrush x:Key="InfoBarBackgroundButtonBrush" Color="#E5E7EB"/>
 </ResourceDictionary>

@@ -134,7 +134,7 @@
                 </Grid>
 
                 <ScrollViewer Grid.Row="1" Margin="0,5">
-                    <ItemsControl ItemsSource="{Binding TagManager.SharedTagsForSelection}">
+                    <ItemsControl ItemsSource="{Binding InfoPanel.SharedTagsForSelection}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Horizontal"/>

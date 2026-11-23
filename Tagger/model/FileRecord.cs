@@ -9,6 +9,11 @@
         public DateTime LastModified { get; set; }
         public bool IsDeleted { get; set; }
 
+        public long LastScanId { get; set; }
+        public int SyncStatus { get; set; }
+        public long? PendingSize { get; set; }
+        public DateTime? PendingLastModified { get; set; }
+
         public List<Tag> Tags { get; set; } = new();
     }
 }

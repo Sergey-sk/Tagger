@@ -23,7 +23,9 @@ namespace Tagger.viewmodel.FileViewModels
         public ObservableCollection<FileItemViewModel> SelectedFiles { get; set; } = [];
         public long SelectedFilesSize => SelectedFiles.Sum(f => f.Size);
 
-        public FileGridViewModel(IFileService fileService, ITagCacheService tagCacheService, IDialogService dialogService)
+        public FileGridViewModel(IFileService fileService,
+                                 ITagCacheService tagCacheService,
+                                 IDialogService dialogService)
         {
             _fileService = fileService;
             _tagCacheService = tagCacheService;
@@ -74,7 +76,7 @@ namespace Tagger.viewmodel.FileViewModels
 
             if (!_globalUiTags.ContainsKey(message.tagIds.FirstOrDefault()))
             {
-                _globalUiTags = await _tagCacheService.Update();
+                _globalUiTags = await _tagCacheService.UpdateAsync();
             }
 
             var savedTags = await _fileService.GetTagsByIds(message.tagIds);
@@ -97,7 +99,7 @@ namespace Tagger.viewmodel.FileViewModels
                 }
             }
 
-            WeakReferenceMessenger.Default.Send(new ApplyTagToSearch([]));
+            //WeakReferenceMessenger.Default.Send(new ApplyTagToSearch([]));
         }
 
         private async Task OnRemoveTag(RemoveTagMessage message)

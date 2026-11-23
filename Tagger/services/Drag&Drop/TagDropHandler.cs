@@ -1,19 +1,39 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using GongSolutions.Wpf.DragDrop;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Tagger.messages;
+using Tagger.model;
 using Tagger.services.Drag_Drop;
+using Tagger.services.implementations;
+using Tagger.services.interfaces;
 using Tagger.viewmodel;
 using Tagger.viewmodel.FileViewModels;
-using Tagger.viewmodel.TagManagerViewModel;
+using Tagger.viewmodel.TagManager;
 
 namespace Tagger.services
 {
     public class TagDropHandler : IDropTarget
     {
+        private readonly IFileTagService _fileTagService;
+        private readonly IFileService _fileService;
+        private readonly IDialogService _dialogService;
+        private readonly ITagCollectionController _tagCollectionController;
+
+        public TagDropHandler(IFileTagService fileTagService,
+                              IFileService fileService,
+                              IDialogService dialogService,
+                              ITagCollectionController tagCollectionController)
+        {
+            _fileTagService = fileTagService;
+            _fileService = fileService;
+            _dialogService = dialogService;
+            _tagCollectionController = tagCollectionController;
+        }
+
         public void DragOver(IDropInfo dropInfo)
         {
             bool canDrop = false;
@@ -64,16 +84,61 @@ namespace Tagger.services
             var tagIds = tagsToApply.Select(t => t.Id).ToList();
 
             if (dropInfo.Data is DraggedObjectsPackage<FileItemViewModel> draggedFiles)
-                WeakReferenceMessenger.Default.Send(new ExecuteTagDrop(new TagAssignmentPayload(tagIds, draggedFiles.Objects)));
+                _ = ApplyTagToFilesAsync(tagIds, [.. draggedFiles.Objects.Select(f => f.Id)]);
 
             if (dropInfo.Data is DataObject data && data.ContainsFileDropList())
             {
                 var paths = data.GetFileDropList().Cast<string>().ToArray();
-                WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tagIds, paths));
+                _ = HandleExternalDropAsync(tagIds, paths);
             }
 
             if (dropInfo.Data is string[] filePaths)
-                WeakReferenceMessenger.Default.Send(new ExecuteExternalTagDrop(tagIds, filePaths));
+                _ = HandleExternalDropAsync(tagIds, filePaths);
+        }
+
+        private async Task ApplyTagToFilesAsync(List<int> tagIds, List<int> fileIds)
+        {
+            try
+            {
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync([.. tagIds], [.. fileIds]);
+
+                _tagCollectionController.AppendFilesToUiTags(tagIds, newFileIds.Count);
+
+                WeakReferenceMessenger.Default.Send(new TagsForSelectionChangedMessage());
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagIds, fileIds));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task HandleExternalDropAsync(List<int> tagIds, string[] filePaths)
+        {
+            try
+            {
+                bool isOperationActive = true;
+
+                var progress = new Progress<string>(msg =>
+                {
+                    if (isOperationActive)
+                        WeakReferenceMessenger.Default.Send(new ChangeProgressStatus(true, msg));
+                });
+
+                var fileIds = await _fileService.AddFilesFromPathAsync(filePaths.ToList(), progress);
+
+                var newFileIds = await _fileTagService.LinkFilesToTagAsync([.. tagIds], [.. fileIds]);
+
+                _tagCollectionController.AppendFilesToUiTags(tagIds, newFileIds.Count);
+
+                isOperationActive = false;
+
+                WeakReferenceMessenger.Default.Send(new ApplyTagMessage(tagIds, fileIds));
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }

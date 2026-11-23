@@ -21,5 +21,7 @@ namespace Tagger.services.interfaces
         Task DetachTagFromFilesAsync(int tagId, List<int> selectedFileIds);
 
         Task DetachAllTagsFromFilesAsync(int fileId);
+
+        Task<List<int>> AddFilesFromPathAsync(List<string> paths, IProgress<string> progress);
     }
 }

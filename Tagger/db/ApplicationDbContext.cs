@@ -20,19 +20,6 @@ namespace Tagger.db
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-        //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        //{
-        //    if (!optionsBuilder.IsConfigured)
-        //    {
-        //        var config = new ConfigurationBuilder()
-        //            .SetBasePath(Directory.GetCurrentDirectory())
-        //            .AddJsonFile("appsettings.json")
-        //            .Build();
-
-        //        optionsBuilder.UseSqlite(config.GetConnectionString("DefaultConnection"));
-        //    }
-        //}
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<FileRecord>(entity =>
@@ -66,6 +53,7 @@ namespace Tagger.db
             {
                 entity.ToTable("TempScannedFiles");
                 entity.HasKey(tsf => tsf.Path);
+                entity.HasIndex(tsf => tsf.Path);
             });
         }
     }

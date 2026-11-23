@@ -11,9 +11,11 @@ using Tagger.services.interfaces;
 using Tagger.viewmodel;
 using Tagger.viewmodel.FileViewerViewModel;
 using Tagger.viewmodel.FileViewModels;
+using Tagger.viewmodel.InfoBar;
 using Tagger.viewmodel.InfoPanelViewModel;
 using Tagger.viewmodel.ScannerViewModel;
 using Tagger.viewmodel.Search;
+using Tagger.viewmodel.TagManager;
 using Tagger.viewmodel.TagManagerViewModel;
 using Tagger.viewmodel.WorkspaceViewModel;
 
@@ -50,15 +52,23 @@ namespace Tagger
                     services.AddTransient<FileGridViewModel>();
                     services.AddTransient<FolderWorkspaceViewModel>();
 
+                    services.AddTransient<TagListViewModel>();
+                    services.AddTransient<TagSelectionFilterViewModel>();
+                    services.AddTransient<TagCrudActionsViewModel>();
+
+                    services.AddTransient<InfoBarViewModel>();
+
                     services.AddSingleton<IDialogService, DialogService>();
                     services.AddSingleton<ITagService, TagService>();
-                    services.AddSingleton<IFileIndexingService, FileIndexingService>();
                     services.AddSingleton<IScanningService, ScanningService>();
                     services.AddSingleton<ISavedSearchService, SavedSearchService>();
                     services.AddSingleton<IFileService, FileService>();
                     services.AddSingleton<IFileTagService, FileTagService>();
                     services.AddSingleton<IInfoPanelService, InfoPanelService>();
                     services.AddSingleton<ITagCacheService, TagCacheService>();
+                    services.AddSingleton<ITagStateContext, TagStateContext>();
+
+                    services.AddHostedService<BackgroundScaningService>();
 
                     services.AddSingleton<MainWindow>();
                 })
@@ -75,7 +85,7 @@ namespace Tagger
 
                 using (var context = await contextFactory.CreateDbContextAsync())
                 {
-                    //await context.Database.EnsureDeletedAsync();
+                    await context.Database.EnsureDeletedAsync();
                     await context.Database.EnsureCreatedAsync();
                 }
 

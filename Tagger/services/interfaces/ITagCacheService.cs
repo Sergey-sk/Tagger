@@ -10,6 +10,10 @@ namespace Tagger.services.interfaces
         Task<Dictionary<int, TagItemViewModel>> GetOrCreateCacheAsync();
         Task<List<TagItemViewModel>> GetSelectedTags();
         void Remove(int tagId);
-        Task<Dictionary<int, TagItemViewModel>> Update();
+        Task<Dictionary<int, TagItemViewModel>> UpdateAsync();
+        List<TagItemViewModel> GetTagsForSelection();
+        void AddTagForSelection(TagItemViewModel tag);
+        void RemoveTagForSelection(int id);
+        void RemoveAllTagForSelection();
     }
 }

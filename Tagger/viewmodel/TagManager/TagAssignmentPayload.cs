@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Tagger.viewmodel.FileViewModels;
+﻿using Tagger.viewmodel.FileViewModels;
 
-namespace Tagger.viewmodel.TagManagerViewModel
+namespace Tagger.viewmodel.TagManager
 {
     public class TagAssignmentPayload
     {

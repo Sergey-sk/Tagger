@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using Tagger.model;
 using Tagger.viewmodel.FileViewModels;
-using Tagger.viewmodel.TagManagerViewModel;
+using Tagger.viewmodel.TagManager;
 
 namespace Tagger.viewmodel
 {

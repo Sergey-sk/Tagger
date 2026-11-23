@@ -1,10 +1,9 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using EFCore.BulkExtensions;
+﻿using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Tagger.db;
-using Tagger.messages;
 using Tagger.model;
 using Tagger.services.interfaces;
+using Tagger.viewmodel;
 
 namespace Tagger.services.implementations
 {
@@ -12,11 +11,15 @@ namespace Tagger.services.implementations
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ITagService _tagService;
+        private readonly ITagStateContext _tagStateContext;
 
-        public InfoPanelService(IDbContextFactory<ApplicationDbContext> contextFactory, ITagService tagService)
+        public InfoPanelService(IDbContextFactory<ApplicationDbContext> contextFactory,
+                                ITagService tagService,
+                                ITagStateContext tagStateContext)
         {
             _contextFactory = contextFactory;
             _tagService = tagService;
+            _tagStateContext = tagStateContext;
         }
         public async Task DetachTagFromFilesAsync(int tagId, List<int> fileIds)
         {
@@ -35,15 +38,16 @@ namespace Tagger.services.implementations
 
             if (tag == null)
             {
-                var requestMessage = new AddTagMessage(tagName);
-                await WeakReferenceMessenger.Default.Send(requestMessage);
+                try
+                {
+                    tag = await _tagService.CreateTagAsync(tagName);
 
-                bool isSuccess = await requestMessage.Response;
-                if (!isSuccess)
+                    _tagStateContext.AddTag(tag);
+                }
+                catch (ArgumentException)
+                {
                     return (-1, [-1]);
-
-                tag = await context.Tags.FirstOrDefaultAsync(t => t.Name == tagName);
-                if (tag == null) return (-1, [-1]);
+                }
             }
 
             var fileIds = fileIdsToAttach.ToHashSet();
@@ -67,15 +71,6 @@ namespace Tagger.services.implementations
             }
 
             await context.BulkInsertAsync(fileTags);
-
-            //const int batchSize = 500;
-            //for (int i = 0; i < fileTags.Count; i += batchSize)
-            //{
-            //    var currentBatch = fileTags.Skip(i).Take(batchSize).ToList();
-
-            //    await context.FileTags.AddRangeAsync(currentBatch);
-            //    await context.SaveChangesAsync();
-            //}
 
             return (tag.Id, addedFileIds);
         }

@@ -102,7 +102,6 @@
     </UserControl.Resources>
 
     <Border Margin="10"
-            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             CornerRadius="4">
         <Grid Margin="0,0,10,0">
             <Grid.RowDefinitions>
@@ -117,7 +116,7 @@
                 </TextBlock>
                 <TextBox DockPanel.Dock="Left"
                          Style="{StaticResource filtersTextBox}"
-                         Text="{Binding TagManager.CurrentFilterStr, Mode=OneWay}"
+                         Text="{Binding TagManager.TagSelectionFilter.CurrentFilterStr, Mode=OneWay}"
                          IsReadOnly="True"
                          TextWrapping="Wrap"/>
 
@@ -161,7 +160,6 @@
                         <Setter Property="VerticalContentAlignment" Value="Center"/>
                         <Setter Property="Tag" Value="{Binding DataContext.FileViewer, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
                         <Setter Property="BorderBrush" Value="{DynamicResource TextControlElevationBorderBrush}"/>
-                        <!--<EventSetter Event="PreviewMouseRightButtonDown" Handler="listView_PreviewMouseDoubleClick"/>-->
                         <Setter Property="ContextMenu">
                             <Setter.Value>
                                 <ContextMenu>
@@ -242,10 +240,15 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
                                         <ItemsControl ItemsSource="{Binding TopTags}">
-
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            
                                             <ItemsControl.ItemContainerStyle>
                                                 <Style TargetType="ContentPresenter">
-                                                    <Setter Property="Margin" Value="0,3"/>
+                                                    <Setter Property="Margin" Value="3,0"/>
                                                     <Setter Property="HorizontalAlignment" Value="Left"/>
                                                 </Style>
                                             </ItemsControl.ItemContainerStyle>

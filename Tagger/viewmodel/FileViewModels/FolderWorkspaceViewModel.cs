@@ -7,7 +7,7 @@ using Tagger.services.interfaces;
 
 namespace Tagger.viewmodel.FileViewModels
 {
-    public partial class FolderWorkspaceViewModel : ViewModelBase, IFolderConsumer
+    public partial class FolderWorkspaceViewModel : ViewModelBase, IFolderConsumer 
     {
         private readonly IFileService _fileService;
         private readonly IDialogService _dialogService;
@@ -33,6 +33,11 @@ namespace Tagger.viewmodel.FileViewModels
 
             WeakReferenceMessenger.Default.Register<FilesScannedBatchMessage>(this, async (r, m) =>
             {
+                //await RefreshFolderAsync(_currentActivePath);
+            });
+
+            WeakReferenceMessenger.Default.Register<ReloadFilesMessage>(this, async (r, m) =>
+            {
                 await RefreshFolderAsync(_currentActivePath);
             });
 
@@ -44,8 +49,6 @@ namespace Tagger.viewmodel.FileViewModels
 
         private async Task RefreshFolderAsync(string path)
         {
-            if (IsLoading) return;
-
             _folderCts?.Cancel();
             _folderCts?.Dispose();
             _folderCts = new CancellationTokenSource();

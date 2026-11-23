@@ -1,8 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Messaging;
-using GongSolutions.Wpf.DragDrop;
+﻿using GongSolutions.Wpf.DragDrop;
 using System.Windows;
-using Tagger.messages;
-using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.services.interfaces;
 using Tagger.viewmodel;
@@ -12,10 +9,12 @@ namespace Tagger.services
     public class TagDragHandler : IDragSource
     {
         private readonly IDialogService _dialogService;
+        private readonly ITagStateContext _tagStateContext;
 
-        public TagDragHandler(IDialogService dialogService)
+        public TagDragHandler(IDialogService dialogService, ITagStateContext tagStateContext)
         {
             _dialogService = dialogService;
+            _tagStateContext = tagStateContext;
         }
 
         public void StartDrag(IDragInfo dragInfo)
@@ -30,7 +29,7 @@ namespace Tagger.services
 
             dragInfo.Effects = DragDropEffects.Link;
 
-            WeakReferenceMessenger.Default.Send(new RemoveSelectedTag(selectedTags));
+            _tagStateContext.RemoveSelectedTags(selectedTags);
         }
 
         public bool CanStartDrag(IDragInfo dragInfo)

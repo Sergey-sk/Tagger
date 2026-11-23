@@ -3,7 +3,7 @@ using Tagger.model;
 using Tagger.services.Drag_Drop;
 using Tagger.viewmodel;
 using Tagger.viewmodel.FileViewModels;
-using Tagger.viewmodel.TagManagerViewModel;
+using Tagger.viewmodel.TagManager;
 
 namespace Tagger.messages
 {
@@ -26,10 +26,11 @@ namespace Tagger.messages
     public record ApplyTagMessage(List<int> tagIds, List<int> fileIds);
     public record ApplyFileMessage(List<int> tagIds, List<int> fileIds);
     public record RemoveTagMessage(HashSet<int> tagIds);
+    public record TagsForSelectionChangedMessage();
 
-    public record ExecuteTagDrop(TagAssignmentPayload assignmentPayload);
-    public record ExecuteFileDrop(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags);
-    public record ExecuteExternalTagDrop(List<int> tagIds, string[] paths);
+    //public record ExecuteTagDrop(TagAssignmentPayload assignmentPayload);
+    //public record ExecuteFileDrop(List<int> fileIds, DraggedObjectsPackage<TagItemViewModel> uiTags);
+    //public record ExecuteExternalTagDrop(List<int> tagIds, string[] paths);
 
     public record RemoveSelectedTag(List<TagItemViewModel> tagsToRemove);
 
@@ -39,12 +40,16 @@ namespace Tagger.messages
 
     public record SearchResultAvailableMessage(List<FileItemViewModel> foundFiles);
 
+    public record ClearSelectedTagsMessage();
+
+    public record CreateTagMessage(TagItemViewModel tag);
+
+    public record ClearSearchTextMessage();
+
     public class AddTagMessage(string tagName) : AsyncRequestMessage<bool>()
     {
         public string TagName { get; } = tagName;
     }
-
-    public class RequestUiTagsDictionaryMessage : RequestMessage<Dictionary<int, TagItemViewModel>> { }
 
     public class RequestFilteredUITags(string filter) : AsyncRequestMessage<List<string>>
     {
@@ -52,6 +57,13 @@ namespace Tagger.messages
     }
 
     public class RequestCurrentSearchQueryMessage : RequestMessage<bool> { }
+    public record StartBackroundScan();
+
+    public record BackgroundScanFoundChangesMessage(int newFilesCount, int deletedFilesCount);
+
+    public record ReloadFilesMessage();
+
+    public record ApplyChangesFiles();
 
     public enum ScanStatus
     {

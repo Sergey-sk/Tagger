@@ -4,10 +4,9 @@ using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.ObjectModel;
 using System.Windows;
 using Tagger.messages;
-using Tagger.model;
 using Tagger.services.interfaces;
 using Tagger.viewmodel.FileViewModels;
-using Tagger.viewmodel.TagManagerViewModel;
+using Tagger.viewmodel.TagManager;
 
 namespace Tagger.viewmodel.InfoPanelViewModel
 {
@@ -15,6 +14,8 @@ namespace Tagger.viewmodel.InfoPanelViewModel
     {
         private readonly IInfoPanelService _infoPanelService;
         private readonly IDialogService _dialogService;
+        private readonly ITagCacheService _tagCacheService;
+
         [ObservableProperty]
         private ObservableCollection<TagItemViewModel> _sharedTagsForSelection;
 
@@ -35,15 +36,29 @@ namespace Tagger.viewmodel.InfoPanelViewModel
 
         private bool _isSelectingFromPopup = false;
 
-        public InfoPanelViewModel(IInfoPanelService infoPanelService, IDialogService dialogService)
+        public InfoPanelViewModel(IInfoPanelService infoPanelService,
+                                  IDialogService dialogService,
+                                  ITagCacheService tagCacheService)
         {
             _infoPanelService = infoPanelService;
             _dialogService = dialogService;
+            _tagCacheService = tagCacheService;
 
             WeakReferenceMessenger.Default.Register<SelectedItemsChangedMessage>(this, (r, message) =>
             {
                 if (message.selectedItems.Count > 0 && message.previousCount == 0) IsPanelOpen = true;
                 else if (message.selectedItems.Count == 0) IsPanelOpen = false;
+                SharedTagsForSelection = new ObservableCollection<TagItemViewModel>(_tagCacheService.GetTagsForSelection());
+            });
+
+            WeakReferenceMessenger.Default.Register<DetachAllTagMessage>(this, (r, m) =>
+            {
+                SharedTagsForSelection = new(_tagCacheService.GetTagsForSelection());
+            });
+
+            WeakReferenceMessenger.Default.Register<TagsForSelectionChangedMessage>(this, (r, m) =>
+            {
+                SharedTagsForSelection = new(_tagCacheService.GetTagsForSelection());
             });
         }
 
@@ -53,7 +68,7 @@ namespace Tagger.viewmodel.InfoPanelViewModel
             SearchCommand.Execute(newValue);
         }
 
-        [RelayCommand(AllowConcurrentExecutions =false)]
+        [RelayCommand(AllowConcurrentExecutions = false)]
         private async Task SearchAsync(string newValue, CancellationToken token)
         {
             if (string.IsNullOrEmpty(newValue))
@@ -132,6 +147,8 @@ namespace Tagger.viewmodel.InfoPanelViewModel
             await _infoPanelService.DetachTagFromFilesAsync(tagId, assignmentPayload.Files.Select(f => f.Id).ToList());
 
             WeakReferenceMessenger.Default.Send(new DetachTagMessage(tagId, attachedFiles));
+
+            SharedTagsForSelection = new(_tagCacheService.GetTagsForSelection());
         }
 
         [RelayCommand]
@@ -153,6 +170,7 @@ namespace Tagger.viewmodel.InfoPanelViewModel
             WeakReferenceMessenger.Default.Send(new ApplyFileMessage([tagId], fileIds));
             WeakReferenceMessenger.Default.Send(new ApplyTagMessage([tagId], fileIds));
 
+            SharedTagsForSelection = new(_tagCacheService.GetTagsForSelection());
             SearchTagNameText = string.Empty;
         }
     }
