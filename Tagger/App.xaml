@@ -9,6 +9,10 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Themes/DarkTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
-            </ResourceDictionary>
+            <Style TargetType="Popup">
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+                <Setter Property="UseLayoutRounding" Value="True"/>
+            </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

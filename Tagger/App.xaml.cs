@@ -85,7 +85,6 @@ namespace Tagger
 
                 using (var context = await contextFactory.CreateDbContextAsync())
                 {
-                    await context.Database.EnsureDeletedAsync();
                     await context.Database.EnsureCreatedAsync();
                 }
 

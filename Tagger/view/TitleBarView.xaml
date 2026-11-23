@@ -90,6 +90,7 @@
                         </MenuItem.Style>
                     </MenuItem>
                 </MenuItem>
+                <MenuItem Header="Фоновое сканирование"/>
             </MenuItem>
         </Menu>
 
