@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows;
+﻿using System.Windows;
 
 namespace Tagger.services.interfaces
 {
     public interface IDialogService
     {
         string FolderPath { get; set; }
-        MessageBoxResult ShowMessage(string message, string caption, MessageBoxButton button, MessageBoxImage icon);
+        MessageBoxResult ShowMessage(string message, string caption, MessageBoxButton button = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.Error);
         bool ShowOpenFolderDialog();
     }
 }

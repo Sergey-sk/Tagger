@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Buffers;
 using System.Data;
 using System.IO;
 using System.IO.Enumeration;
@@ -29,7 +30,7 @@ namespace Tagger.services.implementations
             var filesChannel = Channel.CreateUnbounded<ScannedFile>();
             long currentScanId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            var dbWorkerTask = WriteToDbAsync(path, lastSuccessScanTime, filesChannel, currentScanId, progress, cancellationToken, isBackground);
+            var dbWorkerTask = WriteToDbAsync(path, filesChannel, currentScanId, progress, cancellationToken, isBackground);
             var scanTask = ScanFilesAsync(path, filesChannel, cancellationToken);
             await Task.WhenAll(scanTask, dbWorkerTask);
         }
@@ -50,7 +51,7 @@ namespace Tagger.services.implementations
                 AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
             };
 
-            var workers = Enumerable.Range(0, Environment.ProcessorCount).Select(_ => Task.Run(async () =>
+            var workers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
             {
                 await foreach (var currentDir in dirChannel.Reader.ReadAllAsync(cancellationToken))
                 {
@@ -68,7 +69,6 @@ namespace Tagger.services.implementations
                                 else
                                 {
                                     fileChannel.Writer.TryWrite(new ScannedFile(
-                                        entry.FileName.ToString(),
                                         entry.ToFullPath(),
                                         entry.LastWriteTimeUtc.LocalDateTime,
                                         entry.Length));
@@ -79,7 +79,7 @@ namespace Tagger.services.implementations
 
                         foreach (var _ in enumerable)
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
+                            if (cancellationToken.IsCancellationRequested) break;
                         }
                     }
                     catch (Exception) { }
@@ -98,7 +98,6 @@ namespace Tagger.services.implementations
         }
 
         public async Task WriteToDbAsync(string rootPath,
-                                         string lastTime,
                                          Channel<ScannedFile> filesChannel,
                                          long currentScanId,
                                          IProgress<int>? progress,
@@ -115,9 +114,11 @@ namespace Tagger.services.implementations
                 PRAGMA temp_store = MEMORY;", cancellationToken);
 
 
+            const int BatchSize = 50000;
             int totalProcessed = 0;
-            List<ScannedFile> batch = new(50000);
+            ScannedFile[] batch = ArrayPool<ScannedFile>.Shared.Rent(BatchSize);
             var lastUiUpdateTime = DateTime.Now;
+            int counter = 0;
 
             try
             {
@@ -125,12 +126,15 @@ namespace Tagger.services.implementations
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    batch.Add(filePath);
+                    batch[counter++] = filePath;
 
-                    if (batch.Count == 50000)
+                    if (counter == BatchSize)
                     {
-                        totalProcessed += batch.Count;
-                        await InsertDataIntoTemporaryTable(rootPath, batch, currentScanId, isBackground, context, cancellationToken);
+                        totalProcessed += counter;
+                        await InsertFilesToDb(batch.AsMemory(0, counter), currentScanId, isBackground, context, cancellationToken);
+
+                        Array.Clear(batch, 0, counter);
+                        counter = 0;
 
                         if ((DateTime.Now - lastUiUpdateTime).TotalMilliseconds >= 500)
                         {
@@ -140,10 +144,12 @@ namespace Tagger.services.implementations
                     }
                 }
 
-                if (batch.Count > 0)
+                if (counter > 0)
                 {
-                    await InsertDataIntoTemporaryTable(rootPath, batch, currentScanId, isBackground, context, cancellationToken);
-                    totalProcessed += batch.Count;
+                    await InsertFilesToDb(batch.AsMemory(0, counter), currentScanId, isBackground, context, cancellationToken);
+                    totalProcessed += counter;
+                    Array.Clear(batch, 0, counter);
+                    counter = 0;
                 }
 
                 progress?.Report(totalProcessed);
@@ -158,7 +164,7 @@ namespace Tagger.services.implementations
                         .ExecuteUpdateAsync(s => s.SetProperty(f => f.SyncStatus, 2), cancellationToken);
 
                     var newOrModifiedCount = await context.Files
-                        .CountAsync(f => f.Path.StartsWith(rootPath) && (f.SyncStatus == 1 || f.PendingSize != null));
+                        .CountAsync(f => f.Path.StartsWith(rootPath) && (f.SyncStatus == 1 || f.PendingSize != null), cancellationToken);
 
                     if (newOrModifiedCount > 0 || deletedFilesCount > 0)
                     {
@@ -170,14 +176,10 @@ namespace Tagger.services.implementations
 
                     await context.Files
                         .Where(f => f.Path.StartsWith(rootPath) && !f.IsDeleted && f.LastScanId != currentScanId)
-                        .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true));
+                        .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true), cancellationToken);
                 }
 
                 progress?.Report(totalProcessed);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
             }
             catch (Exception)
             {
@@ -185,16 +187,15 @@ namespace Tagger.services.implementations
             }
             finally
             {
-                context.ChangeTracker.AutoDetectChangesEnabled = true;
+                ArrayPool<ScannedFile>.Shared.Return(batch, clearArray: true);
             }
         }
 
-        private async Task InsertDataIntoTemporaryTable(string rootPath,
-                                                        List<ScannedFile> batch,
-                                                        long currentScanId,
-                                                        bool isBackground,
-                                                        ApplicationDbContext context,
-                                                        CancellationToken token)
+        private async Task InsertFilesToDb(ReadOnlyMemory<ScannedFile> batch,
+                                           long currentScanId,
+                                           bool isBackground,
+                                           ApplicationDbContext context,
+                                           CancellationToken token)
         {
             var connection = (SqliteConnection)context.Database.GetDbConnection();
             if (connection.State != ConnectionState.Open)
@@ -246,9 +247,9 @@ namespace Tagger.services.implementations
 
             command.Prepare();
 
-            foreach (var file in batch)
+            foreach (ref readonly var file in batch.Span)
             {
-                pName.Value = file.Name;
+                pName.Value = Path.GetFileName(file.Path.AsSpan()).ToString();
                 pPath.Value = file.Path;
                 pSize.Value = file.FileSize;
                 pMod.Value = file.LastWriteTime;
@@ -257,7 +258,6 @@ namespace Tagger.services.implementations
             }
 
             await transaction.CommitAsync(token);
-            batch.Clear();
         }
 
         public async Task ApplyBackgroundScanChangesAsync(string rootPath, CancellationToken cancellationToken)
@@ -287,13 +287,12 @@ namespace Tagger.services.implementations
                 [normalizedRoot, upperBound], cancellationToken);
 
                 await context.Database.ExecuteSqlRawAsync(@"
-                update Files
-                set IsDeleted = 1,
-                    SyncStatus = 0,
-                    PendingSize = null,
-                    PendingLastModified = null
-                where Path >= {0} and Path < {1}
-                  and SyncStatus = 2",
+                    update Files
+                    set IsDeleted = 1,
+                        PendingSize = null,
+                        PendingLastModified = null
+                    where Path >= {0} and Path < {1}
+                        and SyncStatus = 2",
                 [normalizedRoot, upperBound], cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
@@ -305,7 +304,44 @@ namespace Tagger.services.implementations
             }
         }
 
+        public async Task DiscardBackgroundScanChangesAsync(string rootPath, CancellationToken cancellationToken)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var normalizedRoot = rootPath.EndsWith(Path.DirectorySeparatorChar)
+                ? rootPath
+                : rootPath + Path.DirectorySeparatorChar;
+
+            var upperBound = normalizedRoot + "\uffff";
+
+            using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    delete from Files
+                    where Path >= {0} and Path < {1}
+                      and SyncStatus = 1",
+                [normalizedRoot, upperBound], cancellationToken);
+
+                await context.Database.ExecuteSqlRawAsync(@"
+                    update Files
+                    set SyncStatus = 0,
+                        PendingSize = null,
+                        PendingLastModified = null
+                    where Path >= {0} and Path < {1}
+                        and (SyncStatus = 2 or PendingSize is not null or PendingLastModified is not null)",
+                [normalizedRoot, upperBound], cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
     }
 
-    public readonly record struct ScannedFile(string Name, string Path, DateTime LastWriteTime, long FileSize);
+    public readonly record struct ScannedFile(string Path, DateTime LastWriteTime, long FileSize);
 }

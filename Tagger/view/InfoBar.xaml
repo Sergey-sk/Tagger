@@ -91,7 +91,7 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             Foreground="{DynamicResource InfoBarCloseBrush}"
                             Padding="5,3"
-                            Command="{Binding InfoBar.CloseInfoBarCommand}"/>
+                            Command="{Binding InfoBar.DiscardFileChangesCommand}"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
@@ -111,7 +111,7 @@
                             FontWeight="SemiBold"
                             Foreground="{DynamicResource InfoBarCloseBrush}"
                             Padding="10,5"
-                            Command="{Binding InfoBar.CloseInfoBarCommand}"/>
+                            Command="{Binding InfoBar.DiscardFileChangesCommand}"/>
                 </StackPanel>
 
             </Grid>

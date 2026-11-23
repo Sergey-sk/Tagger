@@ -53,5 +53,12 @@ namespace Tagger.viewmodel.InfoBar
             WeakReferenceMessenger.Default.Send(new ApplyChangesFiles());
             IsInfoBarOpen = false;
         }
+
+        [RelayCommand]
+        public void DiscardFileChanges()
+        {
+            WeakReferenceMessenger.Default.Send(new DiscardChangesFiles());
+            IsInfoBarOpen = false;
+        }
     }
 }

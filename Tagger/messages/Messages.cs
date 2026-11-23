@@ -64,6 +64,7 @@ namespace Tagger.messages
     public record ReloadFilesMessage();
 
     public record ApplyChangesFiles();
+    public record DiscardChangesFiles();
 
     public enum ScanStatus
     {

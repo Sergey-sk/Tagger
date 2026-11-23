@@ -54,6 +54,9 @@ namespace Tagger.viewmodel.ScannerViewModel
 
             WeakReferenceMessenger.Default.Register<ApplyChangesFiles>(this, async (r, m) =>
                 await ApplyChanges());
+
+            WeakReferenceMessenger.Default.Register<DiscardChangesFiles>(this, async (r, m) =>
+                await DiscardChanges());
         }
 
         [RelayCommand(CanExecute = nameof(ScanCanExecute), IncludeCancelCommand = true)]
@@ -178,6 +181,23 @@ namespace Tagger.viewmodel.ScannerViewModel
             finally
             {
                 IsScaning = false;
+            }
+        }
+
+        private async Task DiscardChanges()
+        {
+            var rootPath = Environment.GetEnvironmentVariable("SystemDrive") + "\\";
+
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    await _scanningService.DiscardBackgroundScanChangesAsync(rootPath, CancellationToken.None);
+                });
+            }
+            catch (Exception ex)
+            {
+                ProgressStatus = $"Ошибка при отмене изменений: {ex.Message}";
             }
         }
 

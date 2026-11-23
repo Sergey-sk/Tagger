@@ -1,7 +1,4 @@
 ﻿using Microsoft.Win32;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Windows;
 using Tagger.services.interfaces;
 
@@ -12,7 +9,7 @@ namespace Tagger.services.implementations
         string FolderPath { get; set; }
         string IDialogService.FolderPath { get => FolderPath; set => FolderPath = value; }
 
-        public MessageBoxResult ShowMessage(string message, string caption, MessageBoxButton button, MessageBoxImage icon)
+        public MessageBoxResult ShowMessage(string message, string caption, MessageBoxButton button = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.Error)
         {
             return MessageBox.Show(message, caption, button, icon);
         }
